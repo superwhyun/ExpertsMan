@@ -634,27 +634,22 @@ function generateSeminarPage(doc, seminar) {
   doc.drawTextBox(seminar.summary, 70)
 }
 
-// 동의서 페이지 생성 - 이미지 형식과 동일하게 (글자 크기 확대 버전)
+// 동의서 페이지 생성 - 모던 스타일 (1, 2페이지와 동일한 스타일)
 function generateConsentPage(doc, consent, profile) {
   doc.drawPageHeader()
 
   const pdf = doc.pdf
-  const margin = doc.margin
+  const startX = doc.margin.left
   const contentWidth = doc.contentWidth
-  const startX = margin.left
+  const cornerRadius = 1.5
 
-  // 색상 정의
-  const yellowBg = [255, 255, 204] // 연한 노란색 배경
-  const borderColor = [0, 0, 0]
-  const blueText = [0, 0, 255] // 파란색 (강조용)
-
-  // 셀 그리기 함수
+  // 셀 그리기 함수 (모던 스타일)
   const drawCell = (x, y, w, h, options = {}) => {
     if (options.fill) {
       pdf.setFillColor(...options.fill)
       pdf.rect(x, y, w, h, 'F')
     }
-    pdf.setDrawColor(...borderColor)
+    pdf.setDrawColor(...COLORS.border)
     pdf.setLineWidth(0.3)
     pdf.rect(x, y, w, h, 'S')
   }
@@ -662,11 +657,11 @@ function generateConsentPage(doc, consent, profile) {
   // 텍스트 그리기 함수
   const drawText = (text, x, y, options = {}) => {
     doc.applyFont()
-    pdf.setFontSize(options.fontSize || 9)
+    pdf.setFontSize(options.fontSize || 10)
     if (options.color) {
       pdf.setTextColor(...options.color)
     } else {
-      pdf.setTextColor(0, 0, 0)
+      pdf.setTextColor(...COLORS.text)
     }
     if (options.align === 'center') {
       pdf.text(text, x, y, { align: 'center' })
@@ -679,249 +674,243 @@ function generateConsentPage(doc, consent, profile) {
   let y = doc.y
 
   // 섹션 제목
-  const sectionTitleHeight = 9
-  drawCell(startX, y, contentWidth, sectionTitleHeight, { fill: yellowBg })
-  drawText('개인정보 수집 및 이용 확인서', startX + contentWidth / 2, y + 6, { fontSize: 12, align: 'center' })
-  y += sectionTitleHeight
+  const sectionTitleHeight = 10
+  pdf.setFillColor(...COLORS.primary)
+  pdf.roundedRect(startX, y, contentWidth, sectionTitleHeight, cornerRadius, cornerRadius, 'F')
+  drawText('개인정보 수집 및 이용 확인서', startX + contentWidth / 2, y + 7, { fontSize: 13, align: 'center', color: [255, 255, 255] })
+  y += sectionTitleHeight + 2
 
   // 레이블 열 너비
-  const labelWidth = 32
+  const labelWidth = 34
   const valueWidth = contentWidth - labelWidth
-  const rowHeight = 8
+  const rowHeight = 7
 
   // 성 명
-  drawCell(startX, y, labelWidth, rowHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, rowHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, rowHeight)
-  drawText('성  명', startX + labelWidth / 2, y + 5.5, { fontSize: 9, align: 'center' })
-  drawText(consent.name || profile.name || '', startX + labelWidth + 4, y + 5.5, { fontSize: 9 })
+  drawText('성  명', startX + labelWidth / 2, y + 5, { fontSize: 10, align: 'center' })
+  drawText(consent.name || profile.name || '', startX + labelWidth + 3, y + 5, { fontSize: 10 })
   y += rowHeight
 
   // 소속기관
-  drawCell(startX, y, labelWidth, rowHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, rowHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, rowHeight)
-  drawText('소속기관', startX + labelWidth / 2, y + 5.5, { fontSize: 9, align: 'center' })
-  drawText(consent.organization || profile.organization || '', startX + labelWidth + 4, y + 5.5, { fontSize: 9 })
+  drawText('소속기관', startX + labelWidth / 2, y + 5, { fontSize: 10, align: 'center' })
+  drawText(consent.organization || profile.organization || '', startX + labelWidth + 3, y + 5, { fontSize: 10 })
   y += rowHeight
 
   // 직위(직급)
-  drawCell(startX, y, labelWidth, rowHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, rowHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, rowHeight)
-  drawText('직위(직급)', startX + labelWidth / 2, y + 5.5, { fontSize: 9, align: 'center' })
-  drawText(consent.position || profile.position || '', startX + labelWidth + 4, y + 5.5, { fontSize: 9 })
+  drawText('직위(직급)', startX + labelWidth / 2, y + 5, { fontSize: 10, align: 'center' })
+  drawText(consent.position || profile.position || '', startX + labelWidth + 3, y + 5, { fontSize: 10 })
   y += rowHeight
 
-  // 주 소 (2줄)
-  const addressHeight = 11
-  drawCell(startX, y, labelWidth, addressHeight, { fill: yellowBg })
+  // 주 소
+  const addressHeight = 9
+  drawCell(startX, y, labelWidth, addressHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, addressHeight)
-  drawText('주  소', startX + labelWidth / 2, y + 4.5, { fontSize: 9, align: 'center' })
-  drawText('(자택주소 기입)', startX + labelWidth / 2, y + 8.5, { align: 'center', fontSize: 7 })
-  drawText(consent.address || profile.address || '', startX + labelWidth + 4, y + 6.5, { fontSize: 9 })
+  drawText('주  소', startX + labelWidth / 2, y + 4, { fontSize: 10, align: 'center' })
+  drawText('(자택주소)', startX + labelWidth / 2, y + 7.5, { align: 'center', fontSize: 7 })
+  drawText(consent.address || profile.address || '', startX + labelWidth + 3, y + 5.5, { fontSize: 10 })
   y += addressHeight
 
-  // 은행명 (2줄)
-  drawCell(startX, y, labelWidth, addressHeight, { fill: yellowBg })
+  // 은행명
+  drawCell(startX, y, labelWidth, addressHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, addressHeight)
-  drawText('은행명', startX + labelWidth / 2, y + 4.5, { fontSize: 9, align: 'center' })
-  drawText('(본인명의 계좌)', startX + labelWidth / 2, y + 8.5, { align: 'center', fontSize: 7 })
-  drawText(consent.bankName || '', startX + labelWidth + 4, y + 6.5, { fontSize: 9 })
+  drawText('은행명', startX + labelWidth / 2, y + 4, { fontSize: 10, align: 'center' })
+  drawText('(본인계좌)', startX + labelWidth / 2, y + 7.5, { align: 'center', fontSize: 7 })
+  drawText(consent.bankName || '', startX + labelWidth + 3, y + 5.5, { fontSize: 10 })
   y += addressHeight
 
   // 계좌번호
-  drawCell(startX, y, labelWidth, rowHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, rowHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, rowHeight)
-  drawText('계좌번호', startX + labelWidth / 2, y + 5.5, { fontSize: 9, align: 'center' })
-  drawText(consent.accountNumber || '', startX + labelWidth + 4, y + 5.5, { fontSize: 9 })
+  drawText('계좌번호', startX + labelWidth / 2, y + 5, { fontSize: 10, align: 'center' })
+  drawText(consent.accountNumber || '', startX + labelWidth + 3, y + 5, { fontSize: 10 })
   y += rowHeight
 
-  // 지급액 (복합 테이블) - 이미지와 동일한 구조
-  const paymentHeight = 22
-  drawCell(startX, y, labelWidth, paymentHeight, { fill: yellowBg })
-  drawText('지급액', startX + labelWidth / 2, y + 6, { fontSize: 9, align: 'center' })
-  drawText('(연구원 초빙부서', startX + labelWidth / 2, y + 11, { align: 'center', fontSize: 7 })
-  drawText('담당자가 기재)', startX + labelWidth / 2, y + 15, { align: 'center', fontSize: 7 })
+  // 지급액 (복합 테이블) - 수당|금액|교통비|빈칸|기타|빈칸 구조
+  const paymentHeight = 20
+  const headerRowHeight = 7
+  const valueRowHeight = paymentHeight - headerRowHeight
 
-  // 지급액 내부 테이블 - 이미지 구조대로: 일금 | 원정(₩ )
+  // 지급액 라벨
+  drawCell(startX, y, labelWidth, paymentHeight, { fill: COLORS.headerBg })
+  drawText('지급액', startX + labelWidth / 2, y + 6, { fontSize: 10, align: 'center' })
+  drawText('(연구원 초빙부서', startX + labelWidth / 2, y + 10, { align: 'center', fontSize: 6.5 })
+  drawText('담당자가 기재)', startX + labelWidth / 2, y + 13.5, { align: 'center', fontSize: 6.5 })
+
+  // 지급액 내부 테이블 - 6열: 수당|금액|교통비|빈칸|기타|빈칸
   const innerX = startX + labelWidth
   const innerWidth = valueWidth
-  const col1 = innerWidth * 0.3 // 일금 열
-  const col2 = innerWidth * 0.7 // 원정 열
-  const headerRow = 7
+  const colWidth = innerWidth / 6
 
-  // 첫 번째 행: 일금 | 원정(₩ )
-  drawCell(innerX, y, col1, headerRow, { fill: yellowBg })
-  drawCell(innerX + col1, y, col2, headerRow, { fill: yellowBg })
-  drawText('일금', innerX + col1 / 2, y + 5, { align: 'center', fontSize: 9 })
-  drawText('원정 (₩                              )', innerX + col1 + col2 / 2, y + 5, { align: 'center', fontSize: 9 })
+  // 헤더 행: 수당 | (금액) | 교통비 | (빈칸) | 기타 | (빈칸)
+  drawCell(innerX, y, colWidth, headerRowHeight, { fill: COLORS.headerBg })
+  drawCell(innerX + colWidth, y, colWidth, headerRowHeight)
+  drawCell(innerX + colWidth * 2, y, colWidth, headerRowHeight, { fill: COLORS.headerBg })
+  drawCell(innerX + colWidth * 3, y, colWidth, headerRowHeight)
+  drawCell(innerX + colWidth * 4, y, colWidth, headerRowHeight, { fill: COLORS.headerBg })
+  drawCell(innerX + colWidth * 5, y, colWidth, headerRowHeight)
 
-  // 두 번째 행: 수당 | 교통비 | 기타 헤더
-  const subY = y + headerRow
-  const subCol = innerWidth / 3
-  drawCell(innerX, subY, subCol, headerRow, { fill: yellowBg })
-  drawCell(innerX + subCol, subY, subCol, headerRow, { fill: yellowBg })
-  drawCell(innerX + subCol * 2, subY, subCol, headerRow, { fill: yellowBg })
-  drawText('수당', innerX + subCol / 2, subY + 5, { align: 'center', fontSize: 9 })
-  drawText('교통비', innerX + subCol + subCol / 2, subY + 5, { align: 'center', fontSize: 9 })
-  drawText('기타', innerX + subCol * 2 + subCol / 2, subY + 5, { align: 'center', fontSize: 9 })
+  drawText('수당', innerX + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  // 자문료 자동 입력
+  const feeAmount = profile.fee ? parseInt(profile.fee).toLocaleString() : ''
+  drawText(feeAmount, innerX + colWidth + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  drawText('교통비', innerX + colWidth * 2 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  drawText(consent.transportFee || '', innerX + colWidth * 3 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  drawText('기타', innerX + colWidth * 4 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  drawText(consent.otherFee || '', innerX + colWidth * 5 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
 
-  // 세 번째 행: 값 입력 행 + 안내 메시지
-  const valY = subY + headerRow
-  const valHeight = paymentHeight - headerRow * 2
-  drawCell(innerX, valY, innerWidth, valHeight)
-
-  // 안내 메시지
-  drawText('*계좌에 실제 입금되는 금액은 제세금(8.8%)을 공제한 후 입금됨', innerX + 3, valY + valHeight - 2, { fontSize: 7 })
+  // 안내 메시지 행
+  const noteY = y + headerRowHeight
+  drawCell(innerX, noteY, innerWidth, valueRowHeight)
+  drawText('*계좌에 실제 입금되는 금액은 제세금(8.8%)을 공제한 후 입금됨', innerX + 2, noteY + valueRowHeight - 3, { fontSize: 8 })
   y += paymentHeight
 
   // 개인정보 처리 사유
-  const reasonHeight = 11
-  drawCell(startX, y, labelWidth, reasonHeight, { fill: yellowBg })
+  const reasonHeight = 9
+  drawCell(startX, y, labelWidth, reasonHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, reasonHeight)
-  drawText('개인정보 처리', startX + labelWidth / 2, y + 4.5, { align: 'center', fontSize: 8 })
-  drawText('사유', startX + labelWidth / 2, y + 8.5, { align: 'center', fontSize: 8 })
-  drawText('전문가활용비 지급 및 원천징수영수증의 발급, 지급명세서 제출 등', startX + labelWidth + 4, y + 6.5, { fontSize: 8 })
+  drawText('개인정보', startX + labelWidth / 2, y + 4, { align: 'center', fontSize: 9 })
+  drawText('처리 사유', startX + labelWidth / 2, y + 7.5, { align: 'center', fontSize: 9 })
+  drawText('전문가활용비 지급 및 원천징수영수증의 발급, 지급명세서 제출 등', startX + labelWidth + 3, y + 5.5, { fontSize: 9 })
   y += reasonHeight
 
   // 수집·이용하는 근거 및 대상 항목
-  const basisHeight = 30
-  drawCell(startX, y, labelWidth, basisHeight, { fill: yellowBg })
+  const basisHeight = 26
+  drawCell(startX, y, labelWidth, basisHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, basisHeight)
-  drawText('수집·이용하는', startX + labelWidth / 2, y + 10, { align: 'center', fontSize: 8 })
-  drawText('근거 및 대상 항목', startX + labelWidth / 2, y + 14, { align: 'center', fontSize: 8 })
+  drawText('수집·이용하는', startX + labelWidth / 2, y + 9, { align: 'center', fontSize: 9 })
+  drawText('근거 및', startX + labelWidth / 2, y + 13, { align: 'center', fontSize: 9 })
+  drawText('대상 항목', startX + labelWidth / 2, y + 17, { align: 'center', fontSize: 9 })
 
   const basisText = [
-    '소득세법 제145조(기타소득에 대한 원천징수시기와 방법 및',
-    '원천징수영수증의 발급), 동법 제164조(지급명세서의 제출), 개인정보',
-    '보호법 제15조제1항제4호(계약의 이행)에 의거하여 아래와 같이 개인',
-    '정보를 수집합니다.',
-    '',
+    '소득세법 제145조(기타소득에 대한 원천징수시기와 방법 및 원천징수영수증의',
+    '발급), 동법 제164조(지급명세서의 제출), 개인정보 보호법 제15조제1항',
+    '제4호(계약의 이행)에 의거하여 아래와 같이 개인정보를 수집합니다.',
     '① 기본정보 : 성명, 소속기관, 직위(직급), 주소'
   ]
   basisText.forEach((line, i) => {
-    drawText(line, startX + labelWidth + 4, y + 4.5 + i * 3.8, { fontSize: 7.5 })
+    drawText(line, startX + labelWidth + 3, y + 4 + i * 4, { fontSize: 8 })
   })
   // 파란색 밑줄 텍스트
-  drawText('② 금융정보 : ', startX + labelWidth + 4, y + 4.5 + 6 * 3.8, { fontSize: 7.5 })
-  pdf.setFontSize(7.5)
-  drawText('은행명, 계좌번호', startX + labelWidth + 4 + pdf.getTextWidth('② 금융정보 : '), y + 4.5 + 6 * 3.8, { fontSize: 7.5, color: blueText })
-  // 밑줄 그리기
-  const underlineX = startX + labelWidth + 4 + pdf.getTextWidth('② 금융정보 : ')
-  const underlineW = pdf.getTextWidth('은행명, 계좌번호')
+  const blueText = [30, 64, 175]
+  drawText('② 금융정보 : ', startX + labelWidth + 3, y + 4 + 4 * 4, { fontSize: 8 })
+  pdf.setFontSize(8)
+  drawText('은행명, 계좌번호', startX + labelWidth + 3 + pdf.getTextWidth('② 금융정보 : '), y + 4 + 4 * 4, { fontSize: 8, color: blueText })
+  const underlineX = startX + labelWidth + 3 + pdf.getTextWidth('② 금융정보 : ')
   pdf.setDrawColor(...blueText)
   pdf.setLineWidth(0.2)
-  pdf.line(underlineX, y + 5.5 + 6 * 3.8, underlineX + underlineW, y + 5.5 + 6 * 3.8)
+  pdf.line(underlineX, y + 5 + 4 * 4, underlineX + pdf.getTextWidth('은행명, 계좌번호'), y + 5 + 4 * 4)
   y += basisHeight
 
   // 개인정보의 보유 및 이용 기간
-  const periodHeight = 11
-  drawCell(startX, y, labelWidth, periodHeight, { fill: yellowBg })
+  const periodHeight = 9
+  drawCell(startX, y, labelWidth, periodHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, periodHeight)
-  drawText('개인정보의 보유', startX + labelWidth / 2, y + 4.5, { align: 'center', fontSize: 8 })
-  drawText('및 이용 기간', startX + labelWidth / 2, y + 8.5, { align: 'center', fontSize: 8 })
-  drawText('국세기본법 제85조의3(장부 등의 비치와 보존)에 의거', startX + labelWidth + 4, y + 4.5, { fontSize: 7.5 })
-  drawText('해당국세의 법정신고기한이 지난날부터 ', startX + labelWidth + 4, y + 8, { fontSize: 7.5 })
-  // 5년간 보존 파란색 밑줄
-  pdf.setFontSize(7.5)
-  const periodTextX = startX + labelWidth + 4 + pdf.getTextWidth('해당국세의 법정신고기한이 지난날부터 ')
-  drawText('5년간 보존', periodTextX, y + 8, { fontSize: 7.5, color: blueText })
+  drawText('개인정보의', startX + labelWidth / 2, y + 4, { align: 'center', fontSize: 9 })
+  drawText('보유/이용 기간', startX + labelWidth / 2, y + 7.5, { align: 'center', fontSize: 8 })
+  drawText('국세기본법 제85조의3에 의거 해당국세의 법정신고기한이 지난날부터 ', startX + labelWidth + 3, y + 5.5, { fontSize: 8 })
+  pdf.setFontSize(8)
+  const periodTextX = startX + labelWidth + 3 + pdf.getTextWidth('국세기본법 제85조의3에 의거 해당국세의 법정신고기한이 지난날부터 ')
+  drawText('5년간 보존', periodTextX, y + 5.5, { fontSize: 8, color: blueText })
   pdf.setDrawColor(...blueText)
-  pdf.line(periodTextX, y + 9, periodTextX + pdf.getTextWidth('5년간 보존'), y + 9)
+  pdf.line(periodTextX, y + 6.5, periodTextX + pdf.getTextWidth('5년간 보존'), y + 6.5)
   y += periodHeight
 
-  doc.y = y + 4
+  doc.y = y + 3
 
   // ========== 제2섹션: 고유식별정보 수집 및 이용 확인서 ==========
   y = doc.y
 
   // 섹션 제목
-  drawCell(startX, y, contentWidth, sectionTitleHeight, { fill: yellowBg })
-  drawText('고유식별정보 수집 및 이용 확인서', startX + contentWidth / 2, y + 6, { fontSize: 12, align: 'center' })
-  y += sectionTitleHeight
+  pdf.setFillColor(...COLORS.primary)
+  pdf.roundedRect(startX, y, contentWidth, sectionTitleHeight, cornerRadius, cornerRadius, 'F')
+  drawText('고유식별정보 수집 및 이용 확인서', startX + contentWidth / 2, y + 7, { fontSize: 13, align: 'center', color: [255, 255, 255] })
+  y += sectionTitleHeight + 2
 
   // 주민등록번호
-  drawCell(startX, y, labelWidth, rowHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, rowHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, rowHeight)
-  drawText('주민등록번호', startX + labelWidth / 2, y + 5.5, { align: 'center', fontSize: 8 })
-  drawText(consent.idNumber || profile.idNumber || '', startX + labelWidth + 4, y + 5.5, { fontSize: 9 })
+  drawText('주민등록번호', startX + labelWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  drawText(consent.idNumber || profile.idNumber || '', startX + labelWidth + 3, y + 5, { fontSize: 10 })
   y += rowHeight
 
   // 개인정보 처리 사유
-  drawCell(startX, y, labelWidth, reasonHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, reasonHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, reasonHeight)
-  drawText('개인정보 처리', startX + labelWidth / 2, y + 4.5, { align: 'center', fontSize: 8 })
-  drawText('사유', startX + labelWidth / 2, y + 8.5, { align: 'center', fontSize: 8 })
-  drawText('전문가활용비 지급 및 원천징수영수증의 발급, 지급명세서 제출 등', startX + labelWidth + 4, y + 6.5, { fontSize: 8 })
+  drawText('개인정보', startX + labelWidth / 2, y + 4, { align: 'center', fontSize: 9 })
+  drawText('처리 사유', startX + labelWidth / 2, y + 7.5, { align: 'center', fontSize: 9 })
+  drawText('전문가활용비 지급 및 원천징수영수증의 발급, 지급명세서 제출 등', startX + labelWidth + 3, y + 5.5, { fontSize: 9 })
   y += reasonHeight
 
   // 수집·이용 항목
-  drawCell(startX, y, labelWidth, rowHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, rowHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, rowHeight)
-  drawText('수집·이용 항목', startX + labelWidth / 2, y + 5.5, { align: 'center', fontSize: 8 })
-  drawText('① 고유식별정보 : ', startX + labelWidth + 4, y + 5.5, { fontSize: 8 })
-  // 주민등록번호 파란색 밑줄
-  pdf.setFontSize(8)
-  const idTextX = startX + labelWidth + 4 + pdf.getTextWidth('① 고유식별정보 : ')
-  drawText('주민등록번호', idTextX, y + 5.5, { fontSize: 8, color: blueText })
+  drawText('수집·이용 항목', startX + labelWidth / 2, y + 5, { align: 'center', fontSize: 9 })
+  drawText('① 고유식별정보 : ', startX + labelWidth + 3, y + 5, { fontSize: 9 })
+  pdf.setFontSize(9)
+  const idTextX = startX + labelWidth + 3 + pdf.getTextWidth('① 고유식별정보 : ')
+  drawText('주민등록번호', idTextX, y + 5, { fontSize: 9, color: blueText })
   pdf.setDrawColor(...blueText)
-  pdf.line(idTextX, y + 6.5, idTextX + pdf.getTextWidth('주민등록번호'), y + 6.5)
+  pdf.line(idTextX, y + 6, idTextX + pdf.getTextWidth('주민등록번호'), y + 6)
   y += rowHeight
 
   // 수집·이용 근거
-  const basis2Height = 14
-  drawCell(startX, y, labelWidth, basis2Height, { fill: yellowBg })
+  const basis2Height = 12
+  drawCell(startX, y, labelWidth, basis2Height, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, basis2Height)
-  drawText('수집·이용 근거', startX + labelWidth / 2, y + 7, { align: 'center', fontSize: 8 })
-  drawText('소득세법 제145조(기타소득에 대한 원천징수시기와 방법 및', startX + labelWidth + 4, y + 4.5, { fontSize: 7.5 })
-  drawText('원천징수영수증의 발급), 동법 제164조(지급명세서의 제출)', startX + labelWidth + 4, y + 8, { fontSize: 7.5 })
-  drawText('개인정보 보호법 제15조제1항제4호(계약의 이행)', startX + labelWidth + 4, y + 11.5, { fontSize: 7.5 })
+  drawText('수집·이용 근거', startX + labelWidth / 2, y + 7, { align: 'center', fontSize: 9 })
+  drawText('소득세법 제145조(기타소득에 대한 원천징수시기와 방법 및 원천징수영수증의 발급),', startX + labelWidth + 3, y + 4, { fontSize: 8 })
+  drawText('동법 제164조(지급명세서의 제출), 개인정보 보호법 제15조제1항제4호(계약의 이행)', startX + labelWidth + 3, y + 8, { fontSize: 8 })
   y += basis2Height
 
   // 개인정보의 보유 및 이용 기간
-  drawCell(startX, y, labelWidth, periodHeight, { fill: yellowBg })
+  drawCell(startX, y, labelWidth, periodHeight, { fill: COLORS.headerBg })
   drawCell(startX + labelWidth, y, valueWidth, periodHeight)
-  drawText('개인정보의 보유', startX + labelWidth / 2, y + 4.5, { align: 'center', fontSize: 8 })
-  drawText('및 이용 기간', startX + labelWidth / 2, y + 8.5, { align: 'center', fontSize: 8 })
-  drawText('국세기본법 제85조의3(장부 등의 비치와 보존)에 의거', startX + labelWidth + 4, y + 4.5, { fontSize: 7.5 })
-  drawText('해당국세의 법정신고기한이 지난날부터 ', startX + labelWidth + 4, y + 8, { fontSize: 7.5 })
-  // 5년간 보존 파란색 밑줄
-  pdf.setFontSize(7.5)
-  const period2TextX = startX + labelWidth + 4 + pdf.getTextWidth('해당국세의 법정신고기한이 지난날부터 ')
-  drawText('5년간 보존', period2TextX, y + 8, { fontSize: 7.5, color: blueText })
+  drawText('개인정보의', startX + labelWidth / 2, y + 4, { align: 'center', fontSize: 9 })
+  drawText('보유/이용 기간', startX + labelWidth / 2, y + 7.5, { align: 'center', fontSize: 8 })
+  drawText('국세기본법 제85조의3에 의거 해당국세의 법정신고기한이 지난날부터 ', startX + labelWidth + 3, y + 5.5, { fontSize: 8 })
+  pdf.setFontSize(8)
+  const period2TextX = startX + labelWidth + 3 + pdf.getTextWidth('국세기본법 제85조의3에 의거 해당국세의 법정신고기한이 지난날부터 ')
+  drawText('5년간 보존', period2TextX, y + 5.5, { fontSize: 8, color: blueText })
   pdf.setDrawColor(...blueText)
-  pdf.line(period2TextX, y + 9, period2TextX + pdf.getTextWidth('5년간 보존'), y + 9)
+  pdf.line(period2TextX, y + 6.5, period2TextX + pdf.getTextWidth('5년간 보존'), y + 6.5)
   y += periodHeight
 
-  doc.y = y + 6
+  doc.y = y + 5
 
   // ========== 확인 문구 ==========
-  doc.addCenteredText('위와 같이 개인정보 및 고유식별정보를 수집·활용하는 것을 확인하였으며', 10)
-  doc.addCenteredText('본 수당 지급 목적의 회의 또는 심사 등에 참가하였음을 확인합니다.', 10)
+  doc.addCenteredText('위와 같이 개인정보 및 고유식별정보를 수집·활용하는 것을 확인하였으며', 11)
+  doc.addCenteredText('본 수당 지급 목적의 회의 또는 심사 등에 참가하였음을 확인합니다.', 11)
   doc.addSpace(4)
 
   // 날짜
   const dateStr = `20${consent.year || '    '}년    ${consent.month || '    '}월    ${consent.day || '    '}일`
-  doc.addCenteredText(dateStr, 11)
-  doc.addSpace(5)
+  doc.addCenteredText(dateStr, 12)
+  doc.addSpace(4)
 
   // 성명 및 서명
   doc.applyFont()
-  pdf.setFontSize(11)
-  pdf.setTextColor(0, 0, 0)
-  pdf.text(`성  명`, doc.pageWidth - 70, doc.y)
-  pdf.text(consent.name || profile.name || '', doc.pageWidth - 52, doc.y)
+  pdf.setFontSize(12)
+  pdf.setTextColor(...COLORS.text)
+  pdf.text('성  명', doc.pageWidth - 72, doc.y)
+  pdf.text(consent.name || profile.name || '', doc.pageWidth - 54, doc.y)
   pdf.text('(서명)', doc.pageWidth - 22, doc.y)
 
   // 서명 이미지 추가
   if (consent.signature) {
     try {
-      pdf.addImage(consent.signature, 'PNG', doc.pageWidth - 52, doc.y - 9, 28, 14)
+      pdf.addImage(consent.signature, 'PNG', doc.pageWidth - 54, doc.y - 10, 30, 15)
     } catch (e) {
       console.warn('서명 이미지 추가 실패:', e)
     }
   }
 
-  doc.addSpace(8)
-  doc.addCenteredText('한국전자통신연구원장 귀하', 11)
+  doc.addSpace(7)
+  doc.addCenteredText('한국전자통신연구원장 귀하', 12)
 }
 
 export async function generateMultiPagePDF(_pageIds, filename, formData) {
