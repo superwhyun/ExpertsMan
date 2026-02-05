@@ -83,8 +83,8 @@ function ConsentForm({ data, onChange, profileData }) {
             <input
               type="text"
               value={data.allowance || ''}
-              onChange={(e) => handleChange('allowance', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
             />
           </div>
           <div>
@@ -92,8 +92,8 @@ function ConsentForm({ data, onChange, profileData }) {
             <input
               type="text"
               value={data.transportFee || ''}
-              onChange={(e) => handleChange('transportFee', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
             />
           </div>
           <div>
@@ -101,8 +101,8 @@ function ConsentForm({ data, onChange, profileData }) {
             <input
               type="text"
               value={data.otherFee || ''}
-              onChange={(e) => handleChange('otherFee', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
             />
           </div>
         </div>

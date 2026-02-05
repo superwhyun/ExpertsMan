@@ -755,9 +755,9 @@ function generateConsentPage(doc, consent, profile) {
   drawCell(innerX + colWidth * 5, y, colWidth, headerRowHeight)
 
   drawText('수당', innerX + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
-  // 자문료 자동 입력
-  const feeAmount = profile.fee ? parseInt(profile.fee).toLocaleString() : ''
-  drawText(feeAmount, innerX + colWidth + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
+  // 수당 (consent.allowance 사용)
+  const allowanceAmount = consent.allowance || ''
+  drawText(allowanceAmount, innerX + colWidth + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
   drawText('교통비', innerX + colWidth * 2 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
   drawText(consent.transportFee || '', innerX + colWidth * 3 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })
   drawText('기타', innerX + colWidth * 4 + colWidth / 2, y + 5, { align: 'center', fontSize: 10 })

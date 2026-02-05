@@ -40,7 +40,7 @@ function ExpertFormPage() {
     address: '',
     bankName: '',
     accountNumber: '',
-    allowance: '',
+    allowance: expert?.fee ? parseInt(expert.fee).toLocaleString() : '',
     transportFee: '',
     otherFee: '',
     idNumber: '',
