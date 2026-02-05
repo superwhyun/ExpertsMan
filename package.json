@@ -1,0 +1,9 @@
+{
+    "name": "experts-man-workspace",
+    "version": "1.0.0",
+    "scripts": {
+        "dev:frontend": "npm run dev --prefix experts-man",
+        "dev:backend": "node backend/server.js",
+        "dev": "npx concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
+    }
+}

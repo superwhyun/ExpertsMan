@@ -1,18 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getExpertById } from '../utils/storage'
 
 function PasswordGate() {
   const { expertId } = useParams()
   const navigate = useNavigate()
+  const [expert, setExpert] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  const expert = getExpertById(expertId)
+  useEffect(() => {
+    const fetchData = async () => {
+      const data = await getExpertById(expertId)
+      setExpert(data)
+      setLoading(false)
+    }
+    fetchData()
+  }, [expertId])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     if (!expert) {
       setError('유효하지 않은 접근입니다.')
       return
@@ -23,6 +32,10 @@ function PasswordGate() {
     } else {
       setError('비밀번호가 일치하지 않습니다.')
     }
+  }
+
+  if (loading) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">데이터를 불러오는 중...</div>
   }
 
   if (!expert) {

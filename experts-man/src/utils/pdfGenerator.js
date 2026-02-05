@@ -888,7 +888,8 @@ function generateConsentPage(doc, consent, profile) {
   doc.addSpace(4)
 
   // 날짜
-  const dateStr = `20${consent.year || '    '}년    ${consent.month || '    '}월    ${consent.day || '    '}일`
+  const yearStr = consent.year ? (String(consent.year).length === 2 ? `20${consent.year}` : consent.year) : '    '
+  const dateStr = `${yearStr}년    ${consent.month || '    '}월    ${consent.day || '    '}일`
   doc.addCenteredText(dateStr, 12)
   doc.addSpace(4)
 
