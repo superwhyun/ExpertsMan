@@ -7,3 +7,4 @@ dist-ssr/
 .idea/
 *.log
 backend/database.sqlite
+.env

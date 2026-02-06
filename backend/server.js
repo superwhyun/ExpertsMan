@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -6,9 +7,14 @@ const { getDb } = require('./db');
 const app = express();
 const port = 3001;
 
-// GodGod master password (set via environment variable or default)
-const GODGOD_PASSWORD = process.env.GODGOD_PASSWORD || 'godgod123';
-const TOKEN_SECRET = process.env.TOKEN_SECRET || 'expertsmanSecretKey2024';
+// GodGod master password (set via environment variable)
+const GODGOD_PASSWORD = process.env.GODGOD_PASSWORD;
+const TOKEN_SECRET = process.env.TOKEN_SECRET;
+
+if (!GODGOD_PASSWORD || !TOKEN_SECRET) {
+    console.error('CRITICAL ERROR: GODGOD_PASSWORD or TOKEN_SECRET is not set in environment variables.');
+    process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());
