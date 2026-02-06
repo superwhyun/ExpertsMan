@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { getExpertById, updateMemberVotes, getVoters, checkVoterPassword } from '../utils/storage'
 
 function MemberPollPage() {
-    const { expertId } = useParams()
+    const { workspace, expertId } = useParams()
     const [expert, setExpert] = useState(null)
     const [voterName, setVoterName] = useState('')
     const [voterPassword, setVoterPassword] = useState('')
@@ -15,13 +15,13 @@ function MemberPollPage() {
     // Load expert data
     useEffect(() => {
         const fetchData = async () => {
-            const data = await getExpertById(expertId)
+            const data = await getExpertById(expertId, workspace)
             if (data) {
                 setExpert(data)
             }
         }
         fetchData()
-    }, [expertId])
+    }, [expertId, workspace])
 
     // Load my previously selected slots ONLY once when name is submitted
     useEffect(() => {
@@ -50,11 +50,11 @@ function MemberPollPage() {
             return
         }
         try {
-            await updateMemberVotes(expertId, voterName, selectedSlots)
+            await updateMemberVotes(expertId, voterName, selectedSlots, workspace)
             setSaveMessage('투표가 성공적으로 저장되었습니다!')
 
             // Refresh local data to show updated voter list and labels
-            const updated = await getExpertById(expertId)
+            const updated = await getExpertById(expertId, workspace)
             setExpert({ ...updated })
 
             setTimeout(() => setSaveMessage(''), 3000)
@@ -67,12 +67,12 @@ function MemberPollPage() {
     useEffect(() => {
         const fetchVoters = async () => {
             if (expertId) {
-                const voters = await getVoters(expertId)
+                const voters = await getVoters(expertId, workspace)
                 setAllVoters(voters)
             }
         }
         fetchVoters()
-    }, [expertId, expert]) // Refresh when expert data changes
+    }, [expertId, workspace, expert]) // Refresh when expert data changes
 
     if (!expert && expertId) {
         return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">데이터를 불러오는 중...</div>
@@ -93,7 +93,7 @@ function MemberPollPage() {
         e.preventDefault()
         if (!voterName.trim() || !voterPassword.trim()) return
 
-        const result = await checkVoterPassword(expertId, voterName.trim(), voterPassword.trim())
+        const result = await checkVoterPassword(expertId, voterName.trim(), voterPassword.trim(), workspace)
         if (result.success) {
             setIsNameSubmitted(true)
             setErrorMessage('')

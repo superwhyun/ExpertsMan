@@ -7,7 +7,7 @@ import SeminarForm from '../components/ExpertForm/SeminarForm'
 import ConsentForm from '../components/ExpertForm/ConsentForm'
 
 function ExpertFormPage() {
-  const { expertId } = useParams()
+  const { workspace, expertId } = useParams()
   const navigate = useNavigate()
 
   const [expert, setExpert] = useState(null)
@@ -55,7 +55,7 @@ function ExpertFormPage() {
   // Load expert data and initialize forms (with draft sync)
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getExpertById(expertId)
+      const data = await getExpertById(expertId, workspace)
       if (!data) {
         setLoading(false)
         return
@@ -130,7 +130,7 @@ function ExpertFormPage() {
       setLoading(false)
     }
     fetchData()
-  }, [expertId])
+  }, [expertId, workspace])
 
   // Auto save every 30 seconds
   useEffect(() => {
@@ -312,7 +312,7 @@ function ExpertFormPage() {
             <button
               onClick={async () => {
                 try {
-                  await markNoAvailableSchedule(expertId)
+                  await markNoAvailableSchedule(expertId, workspace)
                   setExpert({ ...expert, status: 'unavailable' })
                 } catch (error) {
                   alert('요청 처리에 실패했습니다. 다시 시도해 주세요.')
@@ -327,7 +327,7 @@ function ExpertFormPage() {
               disabled={!seminar.selectedSlot}
               onClick={async () => {
                 try {
-                  await selectExpertSlot(expertId, seminar.selectedSlot)
+                  await selectExpertSlot(expertId, seminar.selectedSlot, workspace)
                   setExpert({ ...expert, status: 'registered', selectedSlot: seminar.selectedSlot })
 
                   // 전문가가 선택한 날짜를 동의서 날짜로 동기화

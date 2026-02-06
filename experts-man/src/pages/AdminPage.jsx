@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   getExperts, createExpert, deleteExpert, saveExpert, getExpertById,
   addPollingSlot, deletePollingSlot, confirmSlots, startPolling, resetConfirmation
 } from '../utils/storage'
 
+const API_BASE = 'http://localhost:3001/api'
+
 function AdminPage() {
+  const { workspace } = useParams()
+  const navigate = useNavigate()
   const [experts, setExperts] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingExpert, setEditingExpert] = useState(null)
@@ -12,6 +17,8 @@ function AdminPage() {
   const [showPollingModal, setShowPollingModal] = useState(null)
   const [newSlot, setNewSlot] = useState({ date: '', startTime: '09:00', endTime: '11:00' })
   const [selectedConfirmedSlots, setSelectedConfirmedSlots] = useState([])
+  const [workspaceInfo, setWorkspaceInfo] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -23,24 +30,59 @@ function AdminPage() {
   })
 
   useEffect(() => {
-    const fetchData = async () => {
-      const data = await getExperts();
-      setExperts(data);
-    };
-    fetchData();
-  }, [])
+    checkAuth()
+  }, [workspace])
+
+  const checkAuth = async () => {
+    const token = localStorage.getItem(`workspace_token_${workspace}`)
+    if (!token) {
+      navigate(`/${workspace}`, { replace: true })
+      return
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/workspaces/${workspace}/verify`, {
+        headers: { 'X-Workspace-Token': token }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setWorkspaceInfo(data.workspace)
+        fetchData()
+      } else {
+        localStorage.removeItem(`workspace_token_${workspace}`)
+        navigate(`/${workspace}`, { replace: true })
+      }
+    } catch {
+      navigate(`/${workspace}`, { replace: true })
+    }
+  }
+
+  const fetchData = async () => {
+    try {
+      const data = await getExperts(workspace)
+      setExperts(data)
+    } catch (err) {
+      console.error('Failed to load experts:', err)
+    }
+    setLoading(false)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem(`workspace_token_${workspace}`)
+    navigate(`/${workspace}`, { replace: true })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
     if (editingExpert) {
-      await saveExpert({ ...editingExpert, ...formData })
+      await saveExpert({ ...editingExpert, ...formData }, workspace)
     } else {
-      const newExpert = await createExpert(formData)
+      const newExpert = await createExpert(formData, workspace)
       setShowLinkModal(newExpert)
     }
 
-    const updatedExperts = await getExperts()
+    const updatedExperts = await getExperts(workspace)
     setExperts(updatedExperts)
     setShowForm(false)
     setEditingExpert(null)
@@ -62,8 +104,8 @@ function AdminPage() {
 
   const handleDelete = async (id) => {
     if (confirm('정말 삭제하시겠습니까?')) {
-      await deleteExpert(id)
-      const data = await getExperts()
+      await deleteExpert(id, workspace)
+      const data = await getExperts(workspace)
       setExperts(data)
     }
   }
@@ -74,11 +116,11 @@ function AdminPage() {
   }
 
   const getFormUrl = (expert) => {
-    return `${window.location.origin}/form/${expert.id}`
+    return `${window.location.origin}/${workspace}/form/${expert.id}`
   }
 
   const getPollUrl = (expert) => {
-    return `${window.location.origin}/poll/${expert.id}`
+    return `${window.location.origin}/${workspace}/poll/${expert.id}`
   }
 
   const handleAddSlot = async (e) => {
@@ -86,8 +128,8 @@ function AdminPage() {
     if (!newSlot.date || !newSlot.startTime || !newSlot.endTime) return
 
     const timeRange = `${newSlot.startTime}~${newSlot.endTime}`
-    await addPollingSlot(showPollingModal.id, { date: newSlot.date, time: timeRange })
-    const updatedExperts = await getExperts()
+    await addPollingSlot(showPollingModal.id, { date: newSlot.date, time: timeRange }, workspace)
+    const updatedExperts = await getExperts(workspace)
     setExperts(updatedExperts)
     setShowPollingModal(updatedExperts.find(e => e.id === showPollingModal.id))
     // Reset but keep the last used date and auto-calculate next possible time or just default
@@ -95,8 +137,8 @@ function AdminPage() {
   }
 
   const handleDeleteSlot = async (slotId) => {
-    await deletePollingSlot(showPollingModal.id, slotId)
-    const updatedExperts = await getExperts()
+    await deletePollingSlot(showPollingModal.id, slotId, workspace)
+    const updatedExperts = await getExperts(workspace)
     setExperts(updatedExperts)
     setShowPollingModal(updatedExperts.find(e => e.id === showPollingModal.id))
   }
@@ -106,15 +148,15 @@ function AdminPage() {
       alert('최소 하나 이상의 시간대를 선택해주세요.')
       return
     }
-    await confirmSlots(showPollingModal.id, selectedConfirmedSlots)
-    const updatedExperts = await getExperts()
+    await confirmSlots(showPollingModal.id, selectedConfirmedSlots, workspace)
+    const updatedExperts = await getExperts(workspace)
     setExperts(updatedExperts)
     setShowPollingModal(null)
     setSelectedConfirmedSlots([])
   }
 
   const handleOpenPollingModal = async (expert) => {
-    const latestExpert = await getExpertById(expert.id)
+    const latestExpert = await getExpertById(expert.id, workspace)
     setShowPollingModal(latestExpert)
   }
 
@@ -123,8 +165,8 @@ function AdminPage() {
       alert('투표를 시작하려면 최소 하나 이상의 후보 일정을 추가해야 합니다.')
       return
     }
-    await startPolling(showPollingModal.id)
-    const updatedExperts = await getExperts()
+    await startPolling(showPollingModal.id, workspace)
+    const updatedExperts = await getExperts(workspace)
     setExperts(updatedExperts)
     setShowPollingModal(updatedExperts.find(e => e.id === showPollingModal.id))
   }
@@ -143,14 +185,10 @@ function AdminPage() {
     if (!confirm(message)) return
 
     try {
-      console.log('[Reset] Calling resetConfirmation for:', showPollingModal.id)
-      await resetConfirmation(showPollingModal.id)
-      console.log('[Reset] API call successful')
-      const updatedExperts = await getExperts()
-      console.log('[Reset] Updated experts:', updatedExperts)
+      await resetConfirmation(showPollingModal.id, workspace)
+      const updatedExperts = await getExperts(workspace)
       setExperts(updatedExperts)
       const updatedExpert = updatedExperts.find(e => e.id === showPollingModal.id)
-      console.log('[Reset] Updated expert:', updatedExpert)
       setShowPollingModal(updatedExpert)
       setSelectedConfirmedSlots([])
     } catch (error) {
@@ -159,25 +197,48 @@ function AdminPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">로딩 중...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">전문가 목록 관리</h1>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl font-bold text-gray-800">전문가 목록 관리</h1>
+                {workspaceInfo && (
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                    {workspaceInfo.name}
+                  </span>
+                )}
+              </div>
               <p className="text-gray-500 mt-1">세미나 발표자 정보를 관리하고 입력 링크를 생성합니다.</p>
             </div>
-            <button
-              onClick={() => {
-                setEditingExpert(null)
-                setFormData({ name: '', organization: '', position: '', email: '', phone: '', fee: '' })
-                setShowForm(true)
-              }}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              전문가 추가
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setEditingExpert(null)
+                  setFormData({ name: '', organization: '', position: '', email: '', phone: '', fee: '' })
+                  setShowForm(true)
+                }}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                전문가 추가
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                로그아웃
+              </button>
+            </div>
           </div>
         </div>
 

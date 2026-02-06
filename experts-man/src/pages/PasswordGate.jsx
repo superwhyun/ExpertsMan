@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getExpertById } from '../utils/storage'
 
 function PasswordGate() {
-  const { expertId } = useParams()
+  const { workspace, expertId } = useParams()
   const navigate = useNavigate()
   const [expert, setExpert] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,12 +12,12 @@ function PasswordGate() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getExpertById(expertId)
+      const data = await getExpertById(expertId, workspace)
       setExpert(data)
       setLoading(false)
     }
     fetchData()
-  }, [expertId])
+  }, [expertId, workspace])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -28,7 +28,7 @@ function PasswordGate() {
     }
 
     if (password === expert.password) {
-      navigate(`/form/${expertId}/edit`)
+      navigate(`/${workspace}/form/${expertId}/edit`)
     } else {
       setError('비밀번호가 일치하지 않습니다.')
     }
