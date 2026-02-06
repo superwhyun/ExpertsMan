@@ -6,3 +6,4 @@ dist-ssr/
 .vscode/
 .idea/
 *.log
+backend/database.sqlite

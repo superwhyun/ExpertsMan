@@ -276,9 +276,6 @@ app.get('/api/workspaces/:slug/experts', validateWorkspace, requireWorkspaceAuth
             } else {
                 expert.confirmedSlots = [];
             }
-            if (expert.accepted_at) {
-                expert.acceptedAt = expert.accepted_at;
-            }
 
             const passwords = await db.all('SELECT voterName, password FROM voter_passwords WHERE expertId = ?', [expert.id]);
             expert.voterPasswords = {};
@@ -320,9 +317,6 @@ app.get('/api/workspaces/:slug/experts/:id', validateWorkspace, async (req, res)
             expert.confirmedSlots = JSON.parse(expert.confirmed_slots);
         } else {
             expert.confirmedSlots = [];
-        }
-        if (expert.accepted_at) {
-            expert.acceptedAt = expert.accepted_at;
         }
 
         res.json(expert);
@@ -534,16 +528,24 @@ app.post('/api/workspaces/:slug/experts/:id/select-slot', validateWorkspace, asy
         const { id } = req.params;
         const { slot } = req.body;
 
-        const acceptedAt = new Date().toISOString();
+        if (!slot) {
+            return res.status(400).json({ error: '슬롯 정보가 없습니다.' });
+        }
+
+        // Verify expert exists in this workspace
+        const expert = await db.get('SELECT * FROM experts WHERE id = ? AND workspace_id = ?', [id, req.workspace.id]);
+        if (!expert) {
+            return res.status(404).json({ error: '전문가를 찾을 수 없습니다.' });
+        }
 
         await db.run(
-            'UPDATE experts SET status = ?, selected_slot = ?, accepted_at = ? WHERE id = ?',
-            ['registered', JSON.stringify(slot), acceptedAt, id]
+            'UPDATE experts SET status = ?, selected_slot = ? WHERE id = ? AND workspace_id = ?',
+            ['registered', JSON.stringify(slot), id, req.workspace.id]
         );
 
         res.json({ success: true });
     } catch (error) {
-        console.error(error);
+        console.error('select-slot error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -559,6 +561,130 @@ app.post('/api/workspaces/:slug/experts/:id/no-available-schedule', validateWork
             ['unavailable', id]
         );
 
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============ Workspace Request APIs ============
+
+// Create workspace request (public)
+app.post('/api/workspace-requests', async (req, res) => {
+    try {
+        const db = await getDb();
+        const { name, slug, password, contactName, contactEmail, contactPhone, organization, message } = req.body;
+
+        if (!name || !slug || !password || !contactName || !contactEmail) {
+            return res.status(400).json({ error: '필수 항목을 모두 입력해주세요.' });
+        }
+
+        // Check slug uniqueness in workspaces
+        const existingWorkspace = await db.get('SELECT id FROM workspaces WHERE slug = ?', [slug]);
+        if (existingWorkspace) {
+            return res.status(400).json({ error: '이미 사용 중인 URL입니다.' });
+        }
+
+        // Check slug uniqueness in requests
+        const existingRequest = await db.get('SELECT id FROM workspace_requests WHERE slug = ? AND status = ?', [slug, 'pending']);
+        if (existingRequest) {
+            return res.status(400).json({ error: '이미 신청 대기 중인 URL입니다.' });
+        }
+
+        const id = crypto.randomUUID();
+        await db.run(
+            'INSERT INTO workspace_requests (id, name, slug, password, contact_name, contact_email, contact_phone, organization, message, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, name, slug, password, contactName, contactEmail, contactPhone || '', organization || '', message || '', 'pending']
+        );
+
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all workspace requests (GodGod only)
+app.get('/api/godgod/workspace-requests', requireGodGod, async (req, res) => {
+    try {
+        const db = await getDb();
+        const requests = await db.all('SELECT * FROM workspace_requests ORDER BY created_at DESC');
+        res.json(requests);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Approve workspace request (GodGod only)
+app.post('/api/godgod/workspace-requests/:id/approve', requireGodGod, async (req, res) => {
+    try {
+        const db = await getDb();
+        const { id } = req.params;
+
+        const request = await db.get('SELECT * FROM workspace_requests WHERE id = ?', [id]);
+        if (!request) {
+            return res.status(404).json({ error: '신청을 찾을 수 없습니다.' });
+        }
+
+        if (request.status !== 'pending') {
+            return res.status(400).json({ error: '이미 처리된 신청입니다.' });
+        }
+
+        // Create workspace
+        const workspaceId = crypto.randomUUID();
+        await db.run(
+            'INSERT INTO workspaces (id, name, slug, password) VALUES (?, ?, ?, ?)',
+            [workspaceId, request.name, request.slug, request.password]
+        );
+
+        // Update request status
+        await db.run(
+            'UPDATE workspace_requests SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?',
+            ['approved', id]
+        );
+
+        res.json({ success: true, workspaceId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Reject workspace request (GodGod only)
+app.post('/api/godgod/workspace-requests/:id/reject', requireGodGod, async (req, res) => {
+    try {
+        const db = await getDb();
+        const { id } = req.params;
+
+        const request = await db.get('SELECT * FROM workspace_requests WHERE id = ?', [id]);
+        if (!request) {
+            return res.status(404).json({ error: '신청을 찾을 수 없습니다.' });
+        }
+
+        if (request.status !== 'pending') {
+            return res.status(400).json({ error: '이미 처리된 신청입니다.' });
+        }
+
+        await db.run(
+            'UPDATE workspace_requests SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?',
+            ['rejected', id]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete workspace request (GodGod only)
+app.delete('/api/godgod/workspace-requests/:id', requireGodGod, async (req, res) => {
+    try {
+        const db = await getDb();
+        const { id } = req.params;
+        await db.run('DELETE FROM workspace_requests WHERE id = ?', [id]);
         res.json({ success: true });
     } catch (error) {
         console.error(error);

@@ -4,7 +4,7 @@ import jsPDF from 'jspdf'
 let fontLoaded = false
 let fontCache = null
 
-// Noto Sans KR 폰트 로드 함수
+// Noto Sans KR Regular 폰트 로드 함수
 async function loadKoreanFont(pdf) {
   if (fontLoaded && fontCache) {
     pdf.addFileToVFS('NotoSansKR.ttf', fontCache)
@@ -14,7 +14,8 @@ async function loadKoreanFont(pdf) {
   }
 
   try {
-    const fontUrl = 'https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuozeLTq8H4hfeE.ttf'
+    // Noto Sans KR Regular (400) - 가독성이 좋은 웨이트
+    const fontUrl = 'https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLTq8H4hfeE.ttf'
 
     const response = await fetch(fontUrl)
     if (!response.ok) throw new Error('Font fetch failed')

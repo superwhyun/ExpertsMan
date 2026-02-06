@@ -36,7 +36,6 @@ async function initDb() {
             password TEXT,
             selected_slot TEXT,
             confirmed_slots TEXT,
-            accepted_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(workspace_id) REFERENCES workspaces(id)
         );
@@ -86,6 +85,25 @@ async function initDb() {
         await db.run('UPDATE experts SET workspace_id = ? WHERE workspace_id IS NULL', ['default']);
         console.log('Migration: Created default workspace and assigned existing experts');
     }
+
+    // Create workspace_requests table
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS workspace_requests (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            contact_name TEXT NOT NULL,
+            contact_email TEXT NOT NULL,
+            contact_phone TEXT,
+            organization TEXT,
+            message TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            processed_at DATETIME,
+            processed_by TEXT
+        );
+    `);
 
     console.log('Database initialized');
     return db;
