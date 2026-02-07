@@ -1,0 +1,18 @@
+name = "expertsman-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "expertsman-db"
+database_id = "bab3895c-74d9-4077-8457-3f4fbd8c1d1c"
+
+# Environment variables (secrets are set via `wrangler secret put`)
+[vars]
+CORS_ORIGIN = "*"
+
+# Local development
+[env.dev]
+vars = { CORS_ORIGIN = "http://localhost:5173" }

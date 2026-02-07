@@ -3,7 +3,13 @@
     "version": "1.0.0",
     "scripts": {
         "dev:frontend": "npm run dev --prefix experts-man",
-        "dev:backend": "node backend/server.js",
-        "dev": "npx concurrently \"npm run dev:frontend\" \"npm run dev:backend\""
+        "dev:backend": "npm run dev:local --prefix backend",
+        "dev:backend:legacy": "node backend/server.js",
+        "dev": "npx concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+        "dev:legacy": "npx concurrently \"npm run dev:frontend\" \"npm run dev:backend:legacy\"",
+        "build:frontend": "npm run build --prefix experts-man",
+        "deploy:backend": "npm run deploy --prefix backend",
+        "deploy:frontend": "npx wrangler pages deploy experts-man/dist --project-name=expertsman",
+        "deploy": "npm run build:frontend && npm run deploy:frontend && npm run deploy:backend"
     }
 }

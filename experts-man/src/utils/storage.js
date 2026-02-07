@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787/api';
 const FORM_DATA_KEY = 'expert_form_data';
 
 // Get workspace slug from URL
