@@ -5,6 +5,7 @@ export interface Env {
   GODGOD_PASSWORD: string;
   TOKEN_SECRET: string;
   CORS_ORIGIN: string;
+  RETENTION_YEARS?: string;
 }
 
 export interface Workspace {
@@ -79,8 +80,9 @@ export interface WorkspaceRequest {
 }
 
 export interface TokenPayload {
-  type: 'godgod' | 'workspace';
+  type: 'godgod' | 'workspace' | 'expert';
   exp: number;
   workspaceId?: string;
   slug?: string;
+  expertId?: string;
 }

@@ -1,9 +1,53 @@
 import { Hono } from 'hono';
 import type { Env, Workspace, Expert, PollingSlot } from '../types';
-import { generateToken } from '../utils/token';
+import { generateToken, verifyToken } from '../utils/token';
+import { hashPassword, isHashedPassword, verifyPassword } from '../utils/password';
+import { writeAuditLog } from '../utils/audit';
+import {
+  checkAuthRateLimit,
+  clearAuthRateLimit,
+  getClientIp,
+  registerAuthFailure,
+} from '../utils/rateLimit';
 import { validateWorkspace, requireWorkspaceAuth, type WorkspaceContext } from '../middleware/auth';
 
 const workspaces = new Hono<{ Bindings: Env; Variables: { workspace: Workspace } }>();
+
+function toPublicExpert(
+  expert: Expert,
+  pollingSlots: PollingSlot[],
+  selectedSlot: PollingSlot | null,
+  confirmedSlots: PollingSlot[]
+) {
+  return {
+    id: expert.id,
+    workspace_id: expert.workspace_id,
+    name: expert.name,
+    organization: expert.organization || null,
+    position: expert.position || null,
+    fee: expert.fee || null,
+    status: expert.status,
+    created_at: expert.created_at,
+    pollingSlots,
+    selectedSlot,
+    confirmedSlots,
+  };
+}
+
+async function requireExpertAuth(c: WorkspaceContext, expertId: string) {
+  const token = c.req.header('x-expert-token');
+  const workspace = c.get('workspace');
+
+  if (!token) return false;
+
+  const payload = await verifyToken(token, c.env.TOKEN_SECRET);
+  if (!payload || payload.type !== 'expert') return false;
+  if (payload.slug !== workspace.slug) return false;
+  if (payload.workspaceId !== workspace.id) return false;
+  if (payload.expertId !== expertId) return false;
+
+  return true;
+}
 
 // Apply workspace validation to all routes with :slug
 workspaces.use('/:slug/*', validateWorkspace);
@@ -19,8 +63,42 @@ workspaces.get('/:slug', async (c: WorkspaceContext) => {
 workspaces.post('/:slug/auth', async (c: WorkspaceContext) => {
   const workspace = c.get('workspace');
   const { password } = await c.req.json<{ password: string }>();
+  const key = `workspace:${workspace.slug}:${getClientIp(c)}`;
+  const limitConfig = {
+    key,
+    maxAttempts: 5,
+    windowMs: 10 * 60 * 1000,
+    blockMs: 30 * 60 * 1000,
+  };
 
-  if (password === workspace.password) {
+  const limit = await checkAuthRateLimit(c, limitConfig);
+  if (!limit.allowed) {
+    return c.json(
+      { success: false, error: `로그인 시도가 너무 많습니다. ${limit.retryAfterSeconds}초 후 다시 시도하세요.` },
+      429
+    );
+  }
+
+  const isValidPassword = await verifyPassword(password, workspace.password);
+  if (isValidPassword) {
+    await writeAuditLog(c, {
+      actorType: 'workspace',
+      actorId: workspace.slug,
+      workspaceId: workspace.id,
+      action: 'workspace_auth',
+      targetType: 'workspace',
+      targetId: workspace.id,
+      result: 'success',
+      statusCode: 200,
+    });
+    await clearAuthRateLimit(c, key);
+    if (!isHashedPassword(workspace.password)) {
+      const hashed = await hashPassword(password);
+      await c.env.DB.prepare('UPDATE workspaces SET password = ? WHERE id = ?')
+        .bind(hashed, workspace.id)
+        .run();
+    }
+
     const token = await generateToken(
       {
         type: 'workspace',
@@ -37,6 +115,27 @@ workspaces.post('/:slug/auth', async (c: WorkspaceContext) => {
       workspace: { id: workspace.id, name: workspace.name, slug: workspace.slug },
     });
   } else {
+    await writeAuditLog(c, {
+      actorType: 'anonymous',
+      actorId: 'unknown',
+      workspaceId: workspace.id,
+      action: 'workspace_auth',
+      targetType: 'workspace',
+      targetId: workspace.id,
+      result: 'failure',
+      statusCode: 401,
+      reason: 'invalid_password',
+    });
+    const failed = await registerAuthFailure(c, limitConfig);
+    if (failed.blockedNow) {
+      return c.json(
+        {
+          success: false,
+          error: `로그인 시도가 너무 많습니다. ${failed.retryAfterSeconds}초 후 다시 시도하세요.`,
+        },
+        429
+      );
+    }
     return c.json({ success: false, error: '비밀번호가 일치하지 않습니다.' }, 401);
   }
 });
@@ -54,7 +153,7 @@ workspaces.get('/:slug/verify', requireWorkspaceAuth, async (c: WorkspaceContext
 workspaces.get('/:slug/settings', requireWorkspaceAuth, async (c: WorkspaceContext) => {
   const workspace = c.get('workspace');
   return c.json({
-    password: workspace.password,
+    password: '',
     contact_email: workspace.contact_email || '',
     contact_phone: workspace.contact_phone || '',
     organization: workspace.organization || '',
@@ -74,11 +173,13 @@ workspaces.put('/:slug/settings', requireWorkspaceAuth, async (c: WorkspaceConte
       sender_name?: string;
     }>();
 
+    const nextPassword = password ? await hashPassword(password) : workspace.password;
+
     await c.env.DB.prepare(
       'UPDATE workspaces SET password = ?, contact_email = ?, contact_phone = ?, organization = ?, sender_name = ? WHERE id = ?'
     )
       .bind(
-        password || workspace.password,
+        nextPassword,
         contact_email || null,
         contact_phone || null,
         organization || null,
@@ -86,6 +187,24 @@ workspaces.put('/:slug/settings', requireWorkspaceAuth, async (c: WorkspaceConte
         workspace.id
       )
       .run();
+
+    await writeAuditLog(c, {
+      actorType: 'workspace',
+      actorId: workspace.slug,
+      workspaceId: workspace.id,
+      action: 'workspace_settings_update',
+      targetType: 'workspace',
+      targetId: workspace.id,
+      result: 'success',
+      statusCode: 200,
+      metadata: {
+        changedPassword: !!password,
+        changedContactEmail: typeof contact_email !== 'undefined',
+        changedContactPhone: typeof contact_phone !== 'undefined',
+        changedOrganization: typeof organization !== 'undefined',
+        changedSenderName: typeof sender_name !== 'undefined',
+      },
+    });
 
     return c.json({ success: true });
   } catch (error) {
@@ -145,24 +264,12 @@ workspaces.get('/:slug/experts', requireWorkspaceAuth, async (c: WorkspaceContex
         ? JSON.parse(expert.confirmed_slots)
         : [];
 
-      // Fetch voter passwords
-      const passwordsResult = await c.env.DB.prepare(
-        'SELECT voterName, password FROM voter_passwords WHERE expertId = ?'
-      )
-        .bind(expert.id)
-        .all<{ voterName: string; password: string }>();
-
-      const voterPasswords: Record<string, string> = {};
-      passwordsResult.results.forEach((p) => {
-        voterPasswords[p.voterName] = p.password;
-      });
-
       experts.push({
         ...expert,
+        password: undefined,
         pollingSlots,
         selectedSlot,
         confirmedSlots,
-        voterPasswords,
       });
     }
 
@@ -217,12 +324,96 @@ workspaces.get('/:slug/experts/:id', async (c: WorkspaceContext) => {
       ? JSON.parse(expert.confirmed_slots)
       : [];
 
-    return c.json({
-      ...expert,
-      pollingSlots,
-      selectedSlot,
-      confirmedSlots,
-    });
+    const publicSlots = pollingSlots.map((slot) => ({
+      ...slot,
+      voters: undefined,
+    }));
+
+    return c.json(toPublicExpert(expert, publicSlots, selectedSlot, confirmedSlots));
+  } catch (error) {
+    console.error(error);
+    return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+// Expert login for form page
+workspaces.post('/:slug/experts/:id/auth', async (c: WorkspaceContext) => {
+  try {
+    const workspace = c.get('workspace');
+    const id = c.req.param('id');
+    const { password } = await c.req.json<{ password: string }>();
+    const key = `expert:${workspace.slug}:${id}:${getClientIp(c)}`;
+    const limitConfig = {
+      key,
+      maxAttempts: 5,
+      windowMs: 10 * 60 * 1000,
+      blockMs: 30 * 60 * 1000,
+    };
+
+    const limit = await checkAuthRateLimit(c, limitConfig);
+    if (!limit.allowed) {
+      return c.json(
+        { success: false, error: `로그인 시도가 너무 많습니다. ${limit.retryAfterSeconds}초 후 다시 시도하세요.` },
+        429
+      );
+    }
+
+    const expert = await c.env.DB.prepare(
+      'SELECT id, password FROM experts WHERE id = ? AND workspace_id = ?'
+    )
+      .bind(id, workspace.id)
+      .first<{ id: string; password: string | null }>();
+
+    const isValidPassword = await verifyPassword(password, expert?.password);
+    if (!expert || !expert.password || !isValidPassword) {
+      const failed = await registerAuthFailure(c, limitConfig);
+      if (failed.blockedNow) {
+        return c.json(
+          {
+            success: false,
+            error: `로그인 시도가 너무 많습니다. ${failed.retryAfterSeconds}초 후 다시 시도하세요.`,
+          },
+          429
+        );
+      }
+      return c.json({ success: false, error: '비밀번호가 일치하지 않습니다.' }, 401);
+    }
+
+    await clearAuthRateLimit(c, key);
+    if (!isHashedPassword(expert.password)) {
+      const hashed = await hashPassword(password);
+      await c.env.DB.prepare('UPDATE experts SET password = ? WHERE id = ?')
+        .bind(hashed, expert.id)
+        .run();
+    }
+
+    const token = await generateToken(
+      {
+        type: 'expert',
+        workspaceId: workspace.id,
+        slug: workspace.slug,
+        expertId: expert.id,
+      },
+      c.env.TOKEN_SECRET,
+      2 // 2 hours
+    );
+
+    return c.json({ success: true, token });
+  } catch (error) {
+    console.error(error);
+    return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+// Verify expert auth token
+workspaces.get('/:slug/experts/:id/verify-auth', async (c: WorkspaceContext) => {
+  try {
+    const id = c.req.param('id');
+    const isValid = await requireExpertAuth(c, id);
+    if (!isValid) {
+      return c.json({ valid: false }, 401);
+    }
+    return c.json({ valid: true });
   } catch (error) {
     console.error(error);
     return c.json({ error: (error as Error).message }, 500);
@@ -234,6 +425,11 @@ workspaces.post('/:slug/experts', requireWorkspaceAuth, async (c: WorkspaceConte
   try {
     const workspace = c.get('workspace');
     const expert = await c.req.json<Expert & { createdAt?: string }>();
+    const nextPassword = expert.password
+      ? isHashedPassword(expert.password)
+        ? expert.password
+        : await hashPassword(expert.password)
+      : null;
 
     const existing = await c.env.DB.prepare('SELECT id FROM experts WHERE id = ?')
       .bind(expert.id)
@@ -251,12 +447,24 @@ workspaces.post('/:slug/experts', requireWorkspaceAuth, async (c: WorkspaceConte
           expert.phone || null,
           expert.fee || null,
           expert.status,
-          expert.password || null,
+          nextPassword,
           expert.selectedSlot ? JSON.stringify(expert.selectedSlot) : null,
           expert.confirmedSlots ? JSON.stringify(expert.confirmedSlots) : null,
           expert.id
         )
         .run();
+
+      await writeAuditLog(c, {
+        actorType: 'workspace',
+        actorId: workspace.slug,
+        workspaceId: workspace.id,
+        action: 'expert_update',
+        targetType: 'expert',
+        targetId: expert.id,
+        result: 'success',
+        statusCode: 200,
+        metadata: { changedPassword: !!expert.password },
+      });
     } else {
       await c.env.DB.prepare(
         'INSERT INTO experts (id, workspace_id, name, organization, position, email, phone, fee, status, password, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -271,10 +479,21 @@ workspaces.post('/:slug/experts', requireWorkspaceAuth, async (c: WorkspaceConte
           expert.phone || null,
           expert.fee || null,
           expert.status || 'none',
-          expert.password || null,
+          nextPassword,
           expert.createdAt || new Date().toISOString()
         )
         .run();
+
+      await writeAuditLog(c, {
+        actorType: 'workspace',
+        actorId: workspace.slug,
+        workspaceId: workspace.id,
+        action: 'expert_create',
+        targetType: 'expert',
+        targetId: expert.id,
+        result: 'success',
+        statusCode: 200,
+      });
     }
 
     return c.json({ success: true });
@@ -283,6 +502,55 @@ workspaces.post('/:slug/experts', requireWorkspaceAuth, async (c: WorkspaceConte
     return c.json({ error: (error as Error).message }, 500);
   }
 });
+
+// Reset expert access password (requires auth)
+workspaces.post(
+  '/:slug/experts/:id/reset-password',
+  requireWorkspaceAuth,
+  async (c: WorkspaceContext) => {
+    try {
+      const workspace = c.get('workspace');
+      const id = c.req.param('id');
+      const { password } = await c.req.json<{ password?: string }>();
+
+      const nextPassword = String(password || '').trim();
+      if (!nextPassword) {
+        return c.json({ success: false, error: '비밀번호가 필요합니다.' }, 400);
+      }
+
+      const expert = await c.env.DB.prepare(
+        'SELECT id FROM experts WHERE id = ? AND workspace_id = ?'
+      )
+        .bind(id, workspace.id)
+        .first<{ id: string }>();
+
+      if (!expert) {
+        return c.json({ success: false, error: '전문가를 찾을 수 없습니다.' }, 404);
+      }
+
+      const hashed = await hashPassword(nextPassword);
+      await c.env.DB.prepare('UPDATE experts SET password = ? WHERE id = ? AND workspace_id = ?')
+        .bind(hashed, id, workspace.id)
+        .run();
+
+      await writeAuditLog(c, {
+        actorType: 'workspace',
+        actorId: workspace.slug,
+        workspaceId: workspace.id,
+        action: 'expert_password_reset',
+        targetType: 'expert',
+        targetId: id,
+        result: 'success',
+        statusCode: 200,
+      });
+
+      return c.json({ success: true, password: nextPassword });
+    } catch (error) {
+      console.error(error);
+      return c.json({ error: (error as Error).message }, 500);
+    }
+  }
+);
 
 // Delete expert
 workspaces.delete('/:slug/experts/:id', requireWorkspaceAuth, async (c: WorkspaceContext) => {
@@ -299,6 +567,17 @@ workspaces.delete('/:slug/experts/:id', requireWorkspaceAuth, async (c: Workspac
         workspace.id
       ),
     ]);
+
+    await writeAuditLog(c, {
+      actorType: 'workspace',
+      actorId: workspace.slug,
+      workspaceId: workspace.id,
+      action: 'expert_delete',
+      targetType: 'expert',
+      targetId: id,
+      result: 'success',
+      statusCode: 200,
+    });
 
     return c.json({ success: true });
   } catch (error) {
@@ -359,6 +638,22 @@ workspaces.post('/:slug/experts/:id/verify-password', async (c: WorkspaceContext
       voterName: string;
       password: string;
     }>();
+    const normalizedName = voterName.trim().toLowerCase();
+    const key = `voter:${c.req.param('slug')}:${id}:${normalizedName}:${getClientIp(c)}`;
+    const limitConfig = {
+      key,
+      maxAttempts: 8,
+      windowMs: 10 * 60 * 1000,
+      blockMs: 30 * 60 * 1000,
+    };
+
+    const limit = await checkAuthRateLimit(c, limitConfig);
+    if (!limit.allowed) {
+      return c.json(
+        { success: false, message: `시도가 너무 많습니다. ${limit.retryAfterSeconds}초 후 다시 시도하세요.` },
+        429
+      );
+    }
 
     const existing = await c.env.DB.prepare(
       'SELECT password FROM voter_passwords WHERE expertId = ? AND voterName = ?'
@@ -367,18 +662,40 @@ workspaces.post('/:slug/experts/:id/verify-password', async (c: WorkspaceContext
       .first<{ password: string }>();
 
     if (existing) {
-      if (existing.password === password) {
+      const isValidPassword = await verifyPassword(password, existing.password);
+      if (isValidPassword) {
+        await clearAuthRateLimit(c, key);
+        if (!isHashedPassword(existing.password)) {
+          const hashed = await hashPassword(password);
+          await c.env.DB.prepare(
+            'UPDATE voter_passwords SET password = ? WHERE expertId = ? AND voterName = ?'
+          )
+            .bind(hashed, id, voterName)
+            .run();
+        }
         return c.json({ success: true });
       } else {
+        const failed = await registerAuthFailure(c, limitConfig);
+        if (failed.blockedNow) {
+          return c.json(
+            {
+              success: false,
+              message: `시도가 너무 많습니다. ${failed.retryAfterSeconds}초 후 다시 시도하세요.`,
+            },
+            429
+          );
+        }
         return c.json({ success: false, message: '비밀번호가 일치하지 않습니다.' });
       }
     } else {
+      const hashed = await hashPassword(password);
       await c.env.DB.prepare(
         'INSERT INTO voter_passwords (expertId, voterName, password) VALUES (?, ?, ?)'
       )
-        .bind(id, voterName, password)
+        .bind(id, voterName, hashed)
         .run();
 
+      await clearAuthRateLimit(c, key);
       return c.json({ success: true, isNew: true });
     }
   } catch (error) {
@@ -507,6 +824,10 @@ workspaces.post('/:slug/experts/:id/select-slot', async (c: WorkspaceContext) =>
   try {
     const workspace = c.get('workspace');
     const id = c.req.param('id');
+    const isAuthorized = await requireExpertAuth(c, id);
+    if (!isAuthorized) {
+      return c.json({ error: '전문가 인증이 필요합니다.' }, 401);
+    }
     const { slot } = await c.req.json<{ slot: PollingSlot }>();
 
     if (!slot) {
@@ -540,6 +861,10 @@ workspaces.post('/:slug/experts/:id/select-slot', async (c: WorkspaceContext) =>
 workspaces.post('/:slug/experts/:id/no-available-schedule', async (c: WorkspaceContext) => {
   try {
     const id = c.req.param('id');
+    const isAuthorized = await requireExpertAuth(c, id);
+    if (!isAuthorized) {
+      return c.json({ error: '전문가 인증이 필요합니다.' }, 401);
+    }
 
     await c.env.DB.prepare('UPDATE experts SET status = ? WHERE id = ?')
       .bind('unavailable', id)

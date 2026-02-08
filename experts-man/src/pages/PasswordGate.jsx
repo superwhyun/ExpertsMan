@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getExpertById } from '../utils/storage'
+import { authenticateExpert, getExpertById } from '../utils/storage'
 
 function PasswordGate() {
   const { workspace, expertId } = useParams()
@@ -19,7 +19,7 @@ function PasswordGate() {
     fetchData()
   }, [expertId, workspace])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
     if (!expert) {
@@ -27,10 +27,11 @@ function PasswordGate() {
       return
     }
 
-    if (password === expert.password) {
+    const auth = await authenticateExpert(expertId, password, workspace)
+    if (auth.success) {
       navigate(`/${workspace}/form/${expertId}/edit`)
     } else {
-      setError('비밀번호가 일치하지 않습니다.')
+      setError(auth.error || '비밀번호가 일치하지 않습니다.')
     }
   }
 

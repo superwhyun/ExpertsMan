@@ -4,6 +4,7 @@ import type { Env } from './types';
 import godgodRoutes from './routes/godgod';
 import workspacesRoutes from './routes/workspaces';
 import workspaceRequestsRoutes from './routes/workspace-requests';
+import { runRetentionCleanup } from './utils/retention';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -19,7 +20,7 @@ app.use(
       return origin === corsOrigin ? origin : corsOrigin;
     },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'X-GodGod-Token', 'X-Workspace-Token'],
+    allowHeaders: ['Content-Type', 'X-GodGod-Token', 'X-Workspace-Token', 'X-Expert-Token'],
     credentials: true,
   })
 );
@@ -41,4 +42,13 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal Server Error' }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  scheduled: async (_event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(
+      runRetentionCleanup(env).catch((error) => {
+        console.error('Retention cleanup failed:', error);
+      })
+    );
+  },
+};

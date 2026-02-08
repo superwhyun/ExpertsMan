@@ -1,5 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787/api';
 const FORM_DATA_KEY = 'expert_form_data';
+const EXPERT_AUTH_KEY = 'expert_auth_token';
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 // Get workspace slug from URL
 export function getWorkspaceSlug() {
@@ -28,6 +30,26 @@ function getAuthHeaders(workspace) {
   };
 }
 
+function getExpertAuthKey(expertId) {
+  return `${EXPERT_AUTH_KEY}_${expertId}`;
+}
+
+function getExpertToken(expertId) {
+  return sessionStorage.getItem(getExpertAuthKey(expertId));
+}
+
+export function clearExpertAuthToken(expertId) {
+  sessionStorage.removeItem(getExpertAuthKey(expertId));
+}
+
+function getExpertAuthHeaders(expertId) {
+  const token = getExpertToken(expertId);
+  return {
+    'Content-Type': 'application/json',
+    'X-Expert-Token': token || ''
+  };
+}
+
 // Generate random ID
 export function generateId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -52,6 +74,36 @@ export async function getExpertById(id, workspace) {
   const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${id}`);
   if (!response.ok) return null;
   return await response.json();
+}
+
+export async function authenticateExpert(expertId, password, workspace) {
+  const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${expertId}/auth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password })
+  });
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    clearExpertAuthToken(expertId);
+    return { success: false, error: data.error || '비밀번호가 일치하지 않습니다.' };
+  }
+  sessionStorage.setItem(getExpertAuthKey(expertId), data.token);
+  return { success: true };
+}
+
+export async function verifyExpertAuth(expertId, workspace) {
+  const token = getExpertToken(expertId);
+  if (!token) return false;
+
+  const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${expertId}/verify-auth`, {
+    headers: getExpertAuthHeaders(expertId)
+  });
+  if (!response.ok) {
+    clearExpertAuthToken(expertId);
+    return false;
+  }
+  const data = await response.json();
+  return !!data.valid;
 }
 
 // Save expert (create or update)
@@ -85,26 +137,70 @@ export async function createExpert(expertData, workspace) {
   return await saveExpert(expert, workspace);
 }
 
+// Reset expert access password (admin only)
+export async function resetExpertPassword(expertId, workspace, password = generatePassword()) {
+  const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${expertId}/reset-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(workspace),
+    body: JSON.stringify({ password })
+  });
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || '비밀번호 재설정에 실패했습니다.');
+  }
+  return data.password;
+}
+
 // Save form data (temporary save in localStorage)
 export function saveFormData(expertId, formData) {
   const key = `${FORM_DATA_KEY}_${expertId}`;
-  localStorage.setItem(key, JSON.stringify({
-    ...formData,
+  // 편의를 위해 임시저장은 유지하되, 고위험 민감정보는 저장하지 않는다.
+  const safeProfile = formData?.profile
+    ? {
+        ...formData.profile,
+        idNumber: '',
+      }
+    : null;
+  const safeConsent = formData?.consent
+    ? {
+        ...formData.consent,
+        idNumber: '',
+        accountNumber: '',
+        signature: '',
+      }
+    : null;
+
+  const safeDraft = {
+    profile: safeProfile,
+    seminar: formData?.seminar || null,
+    consent: safeConsent,
+    selectedSlot: formData?.selectedSlot || null,
     savedAt: new Date().toISOString()
-  }));
+  };
+  sessionStorage.setItem(key, JSON.stringify(safeDraft));
 }
 
 // Get form data (localStorage)
 export function getFormData(expertId) {
   const key = `${FORM_DATA_KEY}_${expertId}`;
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : null;
+  const data = sessionStorage.getItem(key);
+  if (!data) return null;
+
+  const parsed = JSON.parse(data);
+  if (!parsed?.savedAt) return parsed;
+
+  const age = Date.now() - new Date(parsed.savedAt).getTime();
+  if (Number.isNaN(age) || age > DRAFT_TTL_MS) {
+    sessionStorage.removeItem(key);
+    return null;
+  }
+  return parsed;
 }
 
 // Clear form data (localStorage)
 export function clearFormData(expertId) {
   const key = `${FORM_DATA_KEY}_${expertId}`;
-  localStorage.removeItem(key);
+  sessionStorage.removeItem(key);
 }
 
 // Bulk update votes for a member (public - no auth required)
@@ -195,7 +291,7 @@ export async function confirmSlots(expertId, slotIds, workspace) {
 export async function selectExpertSlot(expertId, slot, workspace) {
   const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${expertId}/select-slot`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getExpertAuthHeaders(expertId),
     body: JSON.stringify({ slot })
   });
   if (!response.ok) throw new Error('슬롯 선택에 실패했습니다.');
@@ -216,7 +312,7 @@ export async function resetConfirmation(expertId, workspace) {
 export async function markNoAvailableSchedule(expertId, workspace) {
   const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${expertId}/no-available-schedule`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: getExpertAuthHeaders(expertId)
   });
   if (!response.ok) throw new Error('요청 처리에 실패했습니다.');
   return await getExpertById(expertId, workspace);

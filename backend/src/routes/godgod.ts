@@ -1,18 +1,50 @@
 import { Hono } from 'hono';
 import type { Env, Workspace, WorkspaceRequest } from '../types';
 import { generateToken } from '../utils/token';
+import { hashPassword, isHashedPassword } from '../utils/password';
+import { writeAuditLog } from '../utils/audit';
+import { runRetentionCleanup } from '../utils/retention';
 import { requireGodGod } from '../middleware/auth';
 
 const godgod = new Hono<{ Bindings: Env }>();
 
 // GodGod authentication
 godgod.post('/auth', async (c) => {
-  const { password } = await c.req.json<{ password: string }>();
+  const body = await c.req.json<{ password?: string }>();
+  const inputPassword = String(body.password ?? '').trim();
+  const masterPassword = String(c.env.GODGOD_PASSWORD ?? '').trim();
 
-  if (password === c.env.GODGOD_PASSWORD) {
+  if (!masterPassword) {
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'godgod_auth',
+      result: 'failure',
+      statusCode: 500,
+      reason: 'missing_master_password',
+    });
+    return c.json({ success: false, error: '서버 인증 설정이 누락되었습니다.' }, 500);
+  }
+
+  if (inputPassword === masterPassword) {
     const token = await generateToken({ type: 'godgod' }, c.env.TOKEN_SECRET, 1); // 1 hour
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'godgod_auth',
+      result: 'success',
+      statusCode: 200,
+    });
     return c.json({ success: true, token });
   } else {
+    await writeAuditLog(c, {
+      actorType: 'anonymous',
+      actorId: 'unknown',
+      action: 'godgod_auth',
+      result: 'failure',
+      statusCode: 401,
+      reason: 'invalid_password',
+    });
     return c.json({ success: false, error: '비밀번호가 일치하지 않습니다.' }, 401);
   }
 });
@@ -76,11 +108,23 @@ godgod.post('/workspaces', requireGodGod, async (c) => {
     }
 
     const id = crypto.randomUUID();
+    const hashedPassword = await hashPassword(password);
     await c.env.DB.prepare(
       'INSERT INTO workspaces (id, name, slug, password, organization, sender_name) VALUES (?, ?, ?, ?, ?, ?)'
     )
-      .bind(id, name, slug, password, organization || null, sender_name || null)
+      .bind(id, name, slug, hashedPassword, organization || null, sender_name || null)
       .run();
+
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'workspace_create',
+      targetType: 'workspace',
+      targetId: id,
+      result: 'success',
+      statusCode: 200,
+      metadata: { slug, name },
+    });
 
     return c.json({ success: true, id, slug });
   } catch (error) {
@@ -104,7 +148,7 @@ godgod.put('/workspaces/:id', requireGodGod, async (c) => {
     }
     if (password) {
       updates.push('password = ?');
-      params.push(password);
+      params.push(await hashPassword(password));
     }
 
     if (updates.length === 0) {
@@ -115,6 +159,17 @@ godgod.put('/workspaces/:id', requireGodGod, async (c) => {
     await c.env.DB.prepare(`UPDATE workspaces SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...params)
       .run();
+
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'workspace_update',
+      targetType: 'workspace',
+      targetId: id,
+      result: 'success',
+      statusCode: 200,
+      metadata: { changedName: !!name, changedPassword: !!password },
+    });
 
     return c.json({ success: true });
   } catch (error) {
@@ -152,6 +207,16 @@ godgod.delete('/workspaces/:id', requireGodGod, async (c) => {
     statements.push(c.env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(id));
 
     await c.env.DB.batch(statements);
+
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'workspace_delete',
+      targetType: 'workspace',
+      targetId: id,
+      result: 'success',
+      statusCode: 200,
+    });
 
     return c.json({ success: true });
   } catch (error) {
@@ -193,6 +258,9 @@ godgod.post('/workspace-requests/:id/approve', requireGodGod, async (c) => {
 
     // Create workspace and update request status atomically
     const workspaceId = crypto.randomUUID();
+    const workspacePassword = isHashedPassword(request.password)
+      ? request.password
+      : await hashPassword(request.password);
 
     await c.env.DB.batch([
       c.env.DB.prepare(
@@ -201,7 +269,7 @@ godgod.post('/workspace-requests/:id/approve', requireGodGod, async (c) => {
         workspaceId,
         request.name,
         request.slug,
-        request.password,
+        workspacePassword,
         request.contact_email || null,
         request.contact_phone || null,
         request.organization || null,
@@ -211,6 +279,18 @@ godgod.post('/workspace-requests/:id/approve', requireGodGod, async (c) => {
         'UPDATE workspace_requests SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?'
       ).bind('approved', id),
     ]);
+
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'workspace_request_approve',
+      targetType: 'workspace_request',
+      targetId: id,
+      workspaceId: workspaceId,
+      result: 'success',
+      statusCode: 200,
+      metadata: { slug: request.slug },
+    });
 
     return c.json({ success: true, workspaceId });
   } catch (error) {
@@ -242,6 +322,16 @@ godgod.post('/workspace-requests/:id/reject', requireGodGod, async (c) => {
       .bind('rejected', id)
       .run();
 
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'workspace_request_reject',
+      targetType: 'workspace_request',
+      targetId: id,
+      result: 'success',
+      statusCode: 200,
+    });
+
     return c.json({ success: true });
   } catch (error) {
     console.error(error);
@@ -254,10 +344,49 @@ godgod.delete('/workspace-requests/:id', requireGodGod, async (c) => {
   try {
     const id = c.req.param('id');
     await c.env.DB.prepare('DELETE FROM workspace_requests WHERE id = ?').bind(id).run();
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'workspace_request_delete',
+      targetType: 'workspace_request',
+      targetId: id,
+      result: 'success',
+      statusCode: 200,
+    });
     return c.json({ success: true });
   } catch (error) {
     console.error(error);
     return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+// Run retention cleanup manually (for verification)
+godgod.post('/maintenance/retention-run', requireGodGod, async (c) => {
+  try {
+    const summary = await runRetentionCleanup(c.env);
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'retention_cleanup_manual',
+      targetType: 'system',
+      targetId: 'retention',
+      result: 'success',
+      statusCode: 200,
+      metadata: summary,
+    });
+    return c.json({ success: true, summary });
+  } catch (error) {
+    await writeAuditLog(c, {
+      actorType: 'godgod',
+      actorId: 'godgod',
+      action: 'retention_cleanup_manual',
+      targetType: 'system',
+      targetId: 'retention',
+      result: 'failure',
+      statusCode: 500,
+      reason: (error as Error).message,
+    });
+    return c.json({ success: false, error: (error as Error).message }, 500);
   }
 });
 

@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getExpertById, saveFormData, getFormData, clearFormData, selectExpertSlot, markNoAvailableSchedule, getWorkspacePublicSettings } from '../utils/storage'
+import {
+  clearExpertAuthToken,
+  clearFormData,
+  getExpertById,
+  getFormData,
+  getWorkspacePublicSettings,
+  markNoAvailableSchedule,
+  saveFormData,
+  selectExpertSlot,
+  verifyExpertAuth
+} from '../utils/storage'
 import { generateMultiPagePDF } from '../utils/pdfGenerator'
 import ProfileForm from '../components/ExpertForm/ProfileForm'
 import SeminarForm from '../components/ExpertForm/SeminarForm'
@@ -56,6 +66,13 @@ function ExpertFormPage() {
   // Load expert data and initialize forms (with draft sync)
   useEffect(() => {
     const fetchData = async () => {
+      const isAuthorized = await verifyExpertAuth(expertId, workspace)
+      if (!isAuthorized) {
+        clearExpertAuthToken(expertId)
+        navigate(`/${workspace}/form/${expertId}`, { replace: true })
+        return
+      }
+
       // 워크스페이스 설정 로드
       try {
         const settings = await getWorkspacePublicSettings(workspace)
@@ -141,7 +158,7 @@ function ExpertFormPage() {
       setLoading(false)
     }
     fetchData()
-  }, [expertId, workspace])
+  }, [expertId, workspace, navigate])
 
   // Auto save every 30 seconds
   useEffect(() => {
@@ -410,6 +427,8 @@ function ExpertFormPage() {
               </button>
             </div>
           </div>
+
+          <p className="text-xs text-amber-700 mt-2">개인정보 처리 안내: 임시저장은 사용자의 브라우저에서 24시간 후 자동 폐기되며 주민등록번호·계좌번호·서명은 임시저장하지 않고, 입력 내용은 서버로 전송되지 않지만 일정 선택 결과(또는 일정 불가 요청)는 서비스 운영을 위해 서버에 전송·저장됩니다. 최종 생성된 PDF 파일을 담당자에게 메일로 송부해 주시기 바랍니다.  </p>
 
 
           {/* Tabs */}

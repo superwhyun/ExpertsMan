@@ -5,5 +5,8 @@
         "dev": "npx concurrently \"npm run dev --prefix experts-man\" \"npm run dev:local --prefix backend\"",
         "dev:cf": "npx concurrently \"npm run dev --prefix experts-man\" \"npm run dev --prefix backend\"",
         "deploy": "npm run build --prefix experts-man && npx wrangler pages deploy experts-man/dist --project-name=expertsman && npm run deploy --prefix backend"
+    },
+    "devDependencies": {
+        "wrangler": "^4.63.0"
     }
 }

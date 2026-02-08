@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   getExperts, createExpert, deleteExpert, saveExpert, getExpertById,
   addPollingSlot, deletePollingSlot, confirmSlots, startPolling, resetConfirmation,
-  getWorkspaceSettings, updateWorkspaceSettings
+  getWorkspaceSettings, resetExpertPassword, updateWorkspaceSettings
 } from '../utils/storage'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787/api'
@@ -21,6 +21,7 @@ function AdminPage() {
   const [workspaceInfo, setWorkspaceInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [passwordResetting, setPasswordResetting] = useState(false)
   const [settingsData, setSettingsData] = useState({
     password: '',
     contact_email: '',
@@ -168,6 +169,20 @@ function AdminPage() {
   const handleOpenPollingModal = async (expert) => {
     const latestExpert = await getExpertById(expert.id, workspace)
     setShowPollingModal(latestExpert)
+  }
+
+  const handleResetExpertPassword = async () => {
+    if (!showLinkModal) return
+    setPasswordResetting(true)
+    try {
+      const newPassword = await resetExpertPassword(showLinkModal.id, workspace)
+      setShowLinkModal({ ...showLinkModal, password: newPassword })
+      alert('전문가 접근 비밀번호를 재발급했습니다.')
+    } catch (error) {
+      alert(error.message || '비밀번호 재발급에 실패했습니다.')
+    } finally {
+      setPasswordResetting(false)
+    }
   }
 
   const handleStartPolling = async () => {
@@ -558,9 +573,10 @@ function AdminPage() {
                     <label className="block text-sm font-medium text-gray-700">전문가 요청 이메일 문구</label>
                     <button
                       onClick={() => {
+                        const passwordText = showLinkModal.password || '비밀번호 재발급 필요'
                         const emailText = showLinkModal.status === 'registered'
-                          ? `안녕하세요, ${showLinkModal.name} 님.\n\n세미나 발표 관련 프로필 등록을 요청드립니다.\n\n아래 링크에서 프로필 정보를 입력해 주시기 바랍니다.\n\n▶ 접속 링크: ${getFormUrl(showLinkModal)}\n▶ 접속 비밀번호: ${showLinkModal.password}\n\n확정된 일정: ${showLinkModal.selectedSlot?.date} ${showLinkModal.selectedSlot?.time}\n\n감사합니다.`
-                          : `안녕하세요, ${showLinkModal.name} 님.\n\n세미나 발표 일정 확인을 요청드립니다.\n\n아래 링크에서 가능한 일정을 선택해 주시기 바랍니다.\n\n▶ 접속 링크: ${getFormUrl(showLinkModal)}\n▶ 접속 비밀번호: ${showLinkModal.password}\n\n일정 선택 후 프로필 정보 입력도 함께 부탁드립니다.\n\n감사합니다.`
+                          ? `안녕하세요, ${showLinkModal.name} 님.\n\n세미나 발표 관련 프로필 등록을 요청드립니다.\n\n아래 링크에서 프로필 정보를 입력해 주시기 바랍니다.\n\n▶ 접속 링크: ${getFormUrl(showLinkModal)}\n▶ 접속 비밀번호: ${passwordText}\n\n확정된 일정: ${showLinkModal.selectedSlot?.date} ${showLinkModal.selectedSlot?.time}\n\n감사합니다.`
+                          : `안녕하세요, ${showLinkModal.name} 님.\n\n세미나 발표 일정 확인을 요청드립니다.\n\n아래 링크에서 가능한 일정을 선택해 주시기 바랍니다.\n\n▶ 접속 링크: ${getFormUrl(showLinkModal)}\n▶ 접속 비밀번호: ${passwordText}\n\n일정 선택 후 프로필 정보 입력도 함께 부탁드립니다.\n\n감사합니다.`
                         copyToClipboard(emailText)
                       }}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"
@@ -575,7 +591,7 @@ function AdminPage() {
                         세미나 발표 관련 프로필 등록을 요청드립니다.{'\n\n'}
                         아래 링크에서 프로필 정보를 입력해 주시기 바랍니다.{'\n\n'}
                         ▶ 접속 링크: <span className="text-blue-600">{getFormUrl(showLinkModal)}</span>{'\n'}
-                        ▶ 접속 비밀번호: <span className="font-mono font-bold">{showLinkModal.password}</span>{'\n\n'}
+                        ▶ 접속 비밀번호: <span className="font-mono font-bold">{showLinkModal.password || '비밀번호 재발급 필요'}</span>{'\n\n'}
                         확정된 일정: <span className="font-semibold">{showLinkModal.selectedSlot?.date} {showLinkModal.selectedSlot?.time}</span>{'\n\n'}
                         감사합니다.
                       </>
@@ -585,7 +601,7 @@ function AdminPage() {
                         세미나 발표 일정 확인을 요청드립니다.{'\n\n'}
                         아래 링크에서 가능한 일정을 선택해 주시기 바랍니다.{'\n\n'}
                         ▶ 접속 링크: <span className="text-blue-600">{getFormUrl(showLinkModal)}</span>{'\n'}
-                        ▶ 접속 비밀번호: <span className="font-mono font-bold">{showLinkModal.password}</span>{'\n\n'}
+                        ▶ 접속 비밀번호: <span className="font-mono font-bold">{showLinkModal.password || '비밀번호 재발급 필요'}</span>{'\n\n'}
                         일정 선택 후 프로필 정보 입력도 함께 부탁드립니다.{'\n\n'}
                         감사합니다.
                       </>
@@ -600,16 +616,30 @@ function AdminPage() {
                   <input
                     type="text"
                     readOnly
-                    value={showLinkModal.password}
-                    className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm font-mono text-lg tracking-wider"
+                    value={showLinkModal.password || ''}
+                    placeholder={showLinkModal.password ? '' : '보안정책상 기존 비밀번호 조회 불가'}
+                    className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm font-mono text-lg tracking-wider placeholder:text-xs"
                   />
                   <button
                     onClick={() => copyToClipboard(showLinkModal.password)}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                    disabled={!showLinkModal.password}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     복사
                   </button>
+                  <button
+                    onClick={handleResetExpertPassword}
+                    disabled={passwordResetting}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {passwordResetting ? '재발급 중...' : '재발급'}
+                  </button>
                 </div>
+                {!showLinkModal.password && (
+                  <p className="text-xs text-amber-700 mt-2">
+                    비밀번호는 해시 저장되어 조회할 수 없습니다. 필요한 경우 재발급 후 공유하세요.
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex gap-3 mt-6">
@@ -915,13 +945,13 @@ function AdminPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">워크스페이스 설정</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호 (변경 시에만 입력)</label>
                 <input
                   type="text"
                   value={settingsData.password}
                   onChange={(e) => setSettingsData({ ...settingsData, password: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="워크스페이스 접근 비밀번호"
+                  placeholder="새 워크스페이스 접근 비밀번호"
                 />
               </div>
               <div>
@@ -976,7 +1006,7 @@ function AdminPage() {
               </button>
               <button
                 onClick={handleSaveSettings}
-                disabled={settingsSaving || !settingsData.password}
+                disabled={settingsSaving}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {settingsSaving ? '저장 중...' : '저장'}

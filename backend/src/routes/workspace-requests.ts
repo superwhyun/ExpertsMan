@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
+import { hashPassword } from '../utils/password';
 
 const workspaceRequests = new Hono<{ Bindings: Env }>();
 
@@ -53,6 +54,7 @@ workspaceRequests.post('/', async (c) => {
     }
 
     const id = crypto.randomUUID();
+    const hashedPassword = await hashPassword(password);
 
     await c.env.DB.prepare(
       'INSERT INTO workspace_requests (id, name, slug, password, contact_name, contact_email, contact_phone, organization, message, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -61,7 +63,7 @@ workspaceRequests.post('/', async (c) => {
         id,
         name,
         slug,
-        password,
+        hashedPassword,
         contactName,
         contactEmail,
         contactPhone || '',

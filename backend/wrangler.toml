@@ -11,8 +11,12 @@ database_id = "bab3895c-74d9-4077-8457-3f4fbd8c1d1c"
 
 # Environment variables (secrets are set via `wrangler secret put`)
 [vars]
-CORS_ORIGIN = "*"
+CORS_ORIGIN = "https://expertsman.metaverse-standards.kr"
+RETENTION_YEARS = "5"
+
+[triggers]
+crons = ["0 3 * * *"]
 
 # Local development
 [env.dev]
-vars = { CORS_ORIGIN = "http://localhost:5173" }
+vars = { CORS_ORIGIN = "http://localhost:5173", RETENTION_YEARS = "5" }
