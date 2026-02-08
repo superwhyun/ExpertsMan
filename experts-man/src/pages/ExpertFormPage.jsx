@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getExpertById, saveFormData, getFormData, clearFormData, selectExpertSlot, markNoAvailableSchedule } from '../utils/storage'
+import { getExpertById, saveFormData, getFormData, clearFormData, selectExpertSlot, markNoAvailableSchedule, getWorkspacePublicSettings } from '../utils/storage'
 import { generateMultiPagePDF } from '../utils/pdfGenerator'
 import ProfileForm from '../components/ExpertForm/ProfileForm'
 import SeminarForm from '../components/ExpertForm/SeminarForm'
@@ -15,6 +15,7 @@ function ExpertFormPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const [isGenerating, setIsGenerating] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+  const [senderName, setSenderName] = useState('')
 
   // Form data states
   const [profile, setProfile] = useState({
@@ -55,6 +56,16 @@ function ExpertFormPage() {
   // Load expert data and initialize forms (with draft sync)
   useEffect(() => {
     const fetchData = async () => {
+      // 워크스페이스 설정 로드
+      try {
+        const settings = await getWorkspacePublicSettings(workspace)
+        if (settings.sender_name) {
+          setSenderName(settings.sender_name)
+        }
+      } catch (err) {
+        console.warn('워크스페이스 설정 로드 실패:', err)
+      }
+
       const data = await getExpertById(expertId, workspace)
       if (!data) {
         setLoading(false)
@@ -205,7 +216,8 @@ function ExpertFormPage() {
       await generateMultiPagePDF(
         null,
         `${profile.name || '전문가'}_제출서류.pdf`,
-        { profile, seminar, consent }
+        { profile, seminar, consent },
+        { senderName }
       )
     } catch (error) {
       console.error('PDF 생성 오류:', error)
@@ -432,6 +444,7 @@ function ExpertFormPage() {
               data={consent}
               onChange={setConsent}
               profileData={profile}
+              senderName={senderName}
             />
           )}
         </div>

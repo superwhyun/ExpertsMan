@@ -54,10 +54,12 @@ godgod.get('/workspaces', requireGodGod, async (c) => {
 // Create workspace
 godgod.post('/workspaces', requireGodGod, async (c) => {
   try {
-    const { name, slug, password } = await c.req.json<{
+    const { name, slug, password, organization, sender_name } = await c.req.json<{
       name: string;
       slug: string;
       password: string;
+      organization?: string;
+      sender_name?: string;
     }>();
 
     if (!name || !slug || !password) {
@@ -75,9 +77,9 @@ godgod.post('/workspaces', requireGodGod, async (c) => {
 
     const id = crypto.randomUUID();
     await c.env.DB.prepare(
-      'INSERT INTO workspaces (id, name, slug, password) VALUES (?, ?, ?, ?)'
+      'INSERT INTO workspaces (id, name, slug, password, organization, sender_name) VALUES (?, ?, ?, ?, ?, ?)'
     )
-      .bind(id, name, slug, password)
+      .bind(id, name, slug, password, organization || null, sender_name || null)
       .run();
 
     return c.json({ success: true, id, slug });
@@ -194,8 +196,17 @@ godgod.post('/workspace-requests/:id/approve', requireGodGod, async (c) => {
 
     await c.env.DB.batch([
       c.env.DB.prepare(
-        'INSERT INTO workspaces (id, name, slug, password) VALUES (?, ?, ?, ?)'
-      ).bind(workspaceId, request.name, request.slug, request.password),
+        'INSERT INTO workspaces (id, name, slug, password, contact_email, contact_phone, organization, sender_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        workspaceId,
+        request.name,
+        request.slug,
+        request.password,
+        request.contact_email || null,
+        request.contact_phone || null,
+        request.organization || null,
+        request.sender_name || (request.organization ? `${request.organization}장` : null)
+      ),
       c.env.DB.prepare(
         'UPDATE workspace_requests SET status = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?'
       ).bind('approved', id),

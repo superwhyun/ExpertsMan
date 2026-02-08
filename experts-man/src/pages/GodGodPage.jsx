@@ -15,7 +15,7 @@ function GodGodPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingWorkspace, setEditingWorkspace] = useState(null)
-  const [newWorkspace, setNewWorkspace] = useState({ name: '', slug: '', password: '' })
+  const [newWorkspace, setNewWorkspace] = useState({ name: '', slug: '', password: '', organization: '', sender_name: '' })
   const [activeTab, setActiveTab] = useState('workspaces')
 
   // Workspace requests state
@@ -131,7 +131,7 @@ function GodGodPage() {
 
       if (data.success) {
         setShowCreateModal(false)
-        setNewWorkspace({ name: '', slug: '', password: '' })
+        setNewWorkspace({ name: '', slug: '', password: '', organization: '', sender_name: '' })
         loadWorkspaces()
       } else {
         alert(data.error || '생성 실패')
@@ -561,7 +561,7 @@ function GodGodPage() {
                   />
                   <p className="text-xs text-gray-500 mt-1">영문 소문자, 숫자, 하이픈만 사용</p>
                 </div>
-                <div className="mb-6">
+                <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">비밀번호</label>
                   <input
                     type="text"
@@ -572,12 +572,33 @@ function GodGodPage() {
                     required
                   />
                 </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">소속 조직</label>
+                  <input
+                    type="text"
+                    value={newWorkspace.organization}
+                    onChange={(e) => setNewWorkspace({ ...newWorkspace, organization: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="회사/팀/부서명"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">발송명의 (PDF 문서 하단)</label>
+                  <input
+                    type="text"
+                    value={newWorkspace.sender_name}
+                    onChange={(e) => setNewWorkspace({ ...newWorkspace, sender_name: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="예: 한국전자통신연구원장"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">미입력 시 소속 조직명 + '장'으로 자동 설정됩니다.</p>
+                </div>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false)
-                      setNewWorkspace({ name: '', slug: '', password: '' })
+                      setNewWorkspace({ name: '', slug: '', password: '', organization: '', sender_name: '' })
                     }}
                     className="flex-1 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500"
                   >

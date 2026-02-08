@@ -636,7 +636,7 @@ function generateSeminarPage(doc, seminar) {
 }
 
 // 동의서 페이지 생성 - 모던 스타일 (1, 2페이지와 동일한 스타일)
-function generateConsentPage(doc, consent, profile) {
+function generateConsentPage(doc, consent, profile, senderName = '') {
   doc.drawPageHeader()
 
   const pdf = doc.pdf
@@ -912,10 +912,10 @@ function generateConsentPage(doc, consent, profile) {
   }
 
   doc.addSpace(7)
-  doc.addCenteredText('한국전자통신연구원장 귀하', 12)
+  doc.addCenteredText(`${senderName} 귀하`, 12)
 }
 
-export async function generateMultiPagePDF(_pageIds, filename, formData) {
+export async function generateMultiPagePDF(_pageIds, filename, formData, options = {}) {
   const doc = new PDFDocument()
 
   // 한글 폰트 로드
@@ -925,6 +925,7 @@ export async function generateMultiPagePDF(_pageIds, filename, formData) {
   }
 
   const { profile, seminar, consent } = formData
+  const senderName = options.senderName || ''
 
   // 페이지 1: 프로필
   generateProfilePage(doc, profile)
@@ -935,7 +936,7 @@ export async function generateMultiPagePDF(_pageIds, filename, formData) {
 
   // 페이지 3: 동의서
   doc.addPage()
-  generateConsentPage(doc, consent, profile)
+  generateConsentPage(doc, consent, profile, senderName)
 
   doc.save(filename)
   return doc.pdf

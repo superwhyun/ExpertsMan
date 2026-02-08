@@ -50,6 +50,58 @@ workspaces.get('/:slug/verify', requireWorkspaceAuth, async (c: WorkspaceContext
   });
 });
 
+// Get workspace settings (requires auth)
+workspaces.get('/:slug/settings', requireWorkspaceAuth, async (c: WorkspaceContext) => {
+  const workspace = c.get('workspace');
+  return c.json({
+    password: workspace.password,
+    contact_email: workspace.contact_email || '',
+    contact_phone: workspace.contact_phone || '',
+    organization: workspace.organization || '',
+    sender_name: workspace.sender_name || '',
+  });
+});
+
+// Update workspace settings (requires auth)
+workspaces.put('/:slug/settings', requireWorkspaceAuth, async (c: WorkspaceContext) => {
+  try {
+    const workspace = c.get('workspace');
+    const { password, contact_email, contact_phone, organization, sender_name } = await c.req.json<{
+      password?: string;
+      contact_email?: string;
+      contact_phone?: string;
+      organization?: string;
+      sender_name?: string;
+    }>();
+
+    await c.env.DB.prepare(
+      'UPDATE workspaces SET password = ?, contact_email = ?, contact_phone = ?, organization = ?, sender_name = ? WHERE id = ?'
+    )
+      .bind(
+        password || workspace.password,
+        contact_email || null,
+        contact_phone || null,
+        organization || null,
+        sender_name || null,
+        workspace.id
+      )
+      .run();
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    return c.json({ error: (error as Error).message }, 500);
+  }
+});
+
+// Get workspace public info including sender_name (public - for form pages)
+workspaces.get('/:slug/public-settings', async (c: WorkspaceContext) => {
+  const workspace = c.get('workspace');
+  return c.json({
+    sender_name: workspace.sender_name || '',
+  });
+});
+
 // Get all experts in workspace (requires auth)
 workspaces.get('/:slug/experts', requireWorkspaceAuth, async (c: WorkspaceContext) => {
   try {

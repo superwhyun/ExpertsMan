@@ -221,3 +221,30 @@ export async function markNoAvailableSchedule(expertId, workspace) {
   if (!response.ok) throw new Error('요청 처리에 실패했습니다.');
   return await getExpertById(expertId, workspace);
 }
+
+// Get workspace settings (requires auth)
+export async function getWorkspaceSettings(workspace) {
+  const response = await fetch(`${getWorkspaceApiBase(workspace)}/settings`, {
+    headers: getAuthHeaders(workspace)
+  });
+  if (!response.ok) throw new Error('설정을 불러오는데 실패했습니다.');
+  return await response.json();
+}
+
+// Update workspace settings (requires auth)
+export async function updateWorkspaceSettings(settings, workspace) {
+  const response = await fetch(`${getWorkspaceApiBase(workspace)}/settings`, {
+    method: 'PUT',
+    headers: getAuthHeaders(workspace),
+    body: JSON.stringify(settings)
+  });
+  if (!response.ok) throw new Error('설정 저장에 실패했습니다.');
+  return await response.json();
+}
+
+// Get workspace public settings (public - no auth required)
+export async function getWorkspacePublicSettings(workspace) {
+  const response = await fetch(`${getWorkspaceApiBase(workspace)}/public-settings`);
+  if (!response.ok) throw new Error('설정을 불러오는데 실패했습니다.');
+  return await response.json();
+}

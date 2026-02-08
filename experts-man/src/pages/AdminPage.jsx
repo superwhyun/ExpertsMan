@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   getExperts, createExpert, deleteExpert, saveExpert, getExpertById,
-  addPollingSlot, deletePollingSlot, confirmSlots, startPolling, resetConfirmation
+  addPollingSlot, deletePollingSlot, confirmSlots, startPolling, resetConfirmation,
+  getWorkspaceSettings, updateWorkspaceSettings
 } from '../utils/storage'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787/api'
@@ -19,6 +20,15 @@ function AdminPage() {
   const [selectedConfirmedSlots, setSelectedConfirmedSlots] = useState([])
   const [workspaceInfo, setWorkspaceInfo] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [settingsData, setSettingsData] = useState({
+    password: '',
+    contact_email: '',
+    contact_phone: '',
+    organization: '',
+    sender_name: ''
+  })
+  const [settingsSaving, setSettingsSaving] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -197,6 +207,29 @@ function AdminPage() {
     }
   }
 
+  const handleOpenSettings = async () => {
+    try {
+      const settings = await getWorkspaceSettings(workspace)
+      setSettingsData(settings)
+      setShowSettingsModal(true)
+    } catch (error) {
+      alert('설정을 불러오는데 실패했습니다.')
+    }
+  }
+
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true)
+    try {
+      await updateWorkspaceSettings(settingsData, workspace)
+      alert('설정이 저장되었습니다.')
+      setShowSettingsModal(false)
+    } catch (error) {
+      alert('설정 저장에 실패했습니다.')
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -231,6 +264,16 @@ function AdminPage() {
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 전문가 추가
+              </button>
+              <button
+                onClick={handleOpenSettings}
+                className="p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                title="설정"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
               </button>
               <button
                 onClick={handleLogout}
@@ -860,6 +903,84 @@ function AdminPage() {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">워크스페이스 설정</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호 *</label>
+                <input
+                  type="text"
+                  value={settingsData.password}
+                  onChange={(e) => setSettingsData({ ...settingsData, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="워크스페이스 접근 비밀번호"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">담당자 이메일</label>
+                <input
+                  type="email"
+                  value={settingsData.contact_email}
+                  onChange={(e) => setSettingsData({ ...settingsData, contact_email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="담당자 이메일"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">담당자 전화번호</label>
+                <input
+                  type="tel"
+                  value={settingsData.contact_phone}
+                  onChange={(e) => setSettingsData({ ...settingsData, contact_phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="010-0000-0000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">소속조직</label>
+                <input
+                  type="text"
+                  value={settingsData.organization}
+                  onChange={(e) => setSettingsData({ ...settingsData, organization: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="예: 한국전자통신연구원"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">발송명의 (PDF 문서 하단)</label>
+                <input
+                  type="text"
+                  value={settingsData.sender_name}
+                  onChange={(e) => setSettingsData({ ...settingsData, sender_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="예: 한국전자통신연구원장"
+                />
+                <p className="text-xs text-gray-500 mt-1">개인정보 동의서 하단의 "OOO 귀하" 부분에 표시됩니다.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSaveSettings}
+                disabled={settingsSaving || !settingsData.password}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {settingsSaving ? '저장 중...' : '저장'}
+              </button>
             </div>
           </div>
         </div>

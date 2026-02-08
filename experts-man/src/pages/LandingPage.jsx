@@ -16,6 +16,7 @@ function LandingPage() {
     contactEmail: '',
     contactPhone: '',
     organization: '',
+    senderName: '',
     message: ''
   })
   const [formError, setFormError] = useState('')
@@ -63,6 +64,7 @@ function LandingPage() {
           contactEmail: '',
           contactPhone: '',
           organization: '',
+          senderName: '',
           message: ''
         })
       } else {
@@ -560,7 +562,7 @@ function LandingPage() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     소속 조직
                   </label>
@@ -572,6 +574,21 @@ function LandingPage() {
                     className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="회사/팀/부서명"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    발송명의 (PDF 문서 하단)
+                  </label>
+                  <input
+                    type="text"
+                    name="senderName"
+                    value={formData.senderName}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="예: 한국전자통신연구원장"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">미입력 시 소속 조직명 + '장'으로 자동 설정됩니다.</p>
                 </div>
 
                 <div className="md:col-span-2">

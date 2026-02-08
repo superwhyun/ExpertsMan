@@ -13,6 +13,10 @@ export interface Workspace {
   slug: string;
   password: string;
   created_at: string;
+  contact_email?: string;
+  contact_phone?: string;
+  organization?: string;
+  sender_name?: string;
   expertCount?: number;
 }
 
@@ -66,6 +70,7 @@ export interface WorkspaceRequest {
   contact_email: string;
   contact_phone?: string;
   organization?: string;
+  sender_name?: string;
   message?: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;

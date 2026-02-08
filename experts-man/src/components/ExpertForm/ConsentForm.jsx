@@ -1,6 +1,6 @@
 import SignaturePad from './SignaturePad'
 
-function ConsentForm({ data, onChange, profileData }) {
+function ConsentForm({ data, onChange, profileData, senderName = '' }) {
   const handleChange = (field, value) => {
     onChange({ ...data, [field]: value })
   }
@@ -218,7 +218,7 @@ function ConsentForm({ data, onChange, profileData }) {
       </div>
 
       <div className="text-center text-gray-600 font-medium">
-        한국전자통신연구원장 귀하
+        {senderName} 귀하
       </div>
     </div>
   )
