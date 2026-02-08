@@ -305,9 +305,9 @@ function AdminPage() {
           <table className="w-full">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">이름</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 min-w-[140px]">이름</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">소속</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">직위</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 max-w-[80px]">직위</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">이메일</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">전화번호</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">자문료</th>

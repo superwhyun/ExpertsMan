@@ -10,3 +10,4 @@ backend/database.sqlite
 .env
 .wrangler/
 backend/.wrangler/
+backend/tmp/

@@ -1,5 +1,6 @@
 const PBKDF2_PREFIX = 'pbkdf2';
-const PBKDF2_ITERATIONS = 210000;
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_MAX_ITERATIONS = 100000;
 const KEY_BITS = 256;
 
 const encoder = new TextEncoder();
@@ -54,19 +55,25 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
-  if (!stored) return false;
-  if (!isHashedPassword(stored)) {
-    return stored === password;
+  try {
+    if (!stored) return false;
+    if (!isHashedPassword(stored)) {
+      return stored === password;
+    }
+
+    const parts = stored.split('$');
+    if (parts.length !== 4) return false;
+    const [, iterText, saltB64, hashB64] = parts;
+    const iterations = Number(iterText);
+    if (!Number.isInteger(iterations) || iterations <= 0) return false;
+    // Cloudflare WebCrypto PBKDF2 upper bound
+    if (iterations > PBKDF2_MAX_ITERATIONS) return false;
+
+    const salt = base64ToBytes(saltB64);
+    const expected = base64ToBytes(hashB64);
+    const derived = await deriveKey(password, salt, iterations);
+    return timingSafeEqual(expected, derived);
+  } catch {
+    return false;
   }
-
-  const parts = stored.split('$');
-  if (parts.length !== 4) return false;
-  const [, iterText, saltB64, hashB64] = parts;
-  const iterations = Number(iterText);
-  if (!Number.isInteger(iterations) || iterations <= 0) return false;
-
-  const salt = base64ToBytes(saltB64);
-  const expected = base64ToBytes(hashB64);
-  const derived = await deriveKey(password, salt, iterations);
-  return timingSafeEqual(expected, derived);
 }
