@@ -174,9 +174,24 @@ function ExpertFormPage() {
       setActiveTab('profile')
       return
     }
+    if (!profile.education || profile.education.length === 0) {
+      alert('학력을 최소 1개 이상 입력해주세요.')
+      setActiveTab('profile')
+      return
+    }
+    if (!profile.career || profile.career.length === 0) {
+      alert('경력을 최소 1개 이상 입력해주세요.')
+      setActiveTab('profile')
+      return
+    }
     if (!seminar.title || !seminar.summary) {
       alert('발표요약을 입력해주세요.')
       setActiveTab('seminar')
+      return
+    }
+    if (!consent.bankName || !consent.accountNumber) {
+      alert('은행명과 계좌번호를 입력해주세요.')
+      setActiveTab('consent')
       return
     }
     if (!consent.signature) {

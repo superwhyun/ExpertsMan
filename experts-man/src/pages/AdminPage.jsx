@@ -132,8 +132,8 @@ function AdminPage() {
     const updatedExperts = await getExperts(workspace)
     setExperts(updatedExperts)
     setShowPollingModal(updatedExperts.find(e => e.id === showPollingModal.id))
-    // Reset but keep the last used date and auto-calculate next possible time or just default
-    setNewSlot({ ...newSlot, startTime: '09:00', endTime: '11:00' })
+    // Reset date only, keep the current time settings
+    setNewSlot({ ...newSlot, date: '' })
   }
 
   const handleDeleteSlot = async (slotId) => {
@@ -453,89 +453,103 @@ function AdminPage() {
                 <p className="text-xs text-gray-500 mt-1">이 링크를 내부 멤버들에게 공유하여 일정 투표를 받으세요.</p>
               </div>
 
-              {/* 전문가 일정 선택 요청 링크 */}
+              {/* 전문가 요청 URL (통합) */}
               <div className="border-t pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  전문가 일정 선택 요청 URL
-                  {showLinkModal.status === 'none' || showLinkModal.status === 'polling' ? (
-                    <span className="text-orange-500 font-normal text-xs ml-1">(후보일정 확정 후 사용 가능)</span>
-                  ) : showLinkModal.status === 'registered' ? (
-                    <span className="text-blue-500 font-normal text-xs ml-1">(일정 선택 완료)</span>
-                  ) : showLinkModal.status === 'unavailable' ? (
-                    <span className="text-amber-500 font-normal text-xs ml-1">(일정 조율 요청됨)</span>
-                  ) : null}
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">전문가 요청 URL</label>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    showLinkModal.status === 'registered'
+                      ? 'bg-blue-100 text-blue-700'
+                      : showLinkModal.status === 'unavailable'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {showLinkModal.status === 'registered'
+                      ? `일정 확정 (${showLinkModal.selectedSlot?.date?.replace(/-/g, '년 ').replace(/-/, '월 ')}일)`
+                      : '일정 확인중'}
+                  </span>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     readOnly
                     value={getFormUrl(showLinkModal)}
-                    className={`flex-1 px-3 py-2 border rounded-lg text-sm ${showLinkModal.status === 'confirmed'
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 text-gray-400 border-gray-200'
-                      }`}
+                    className={`flex-1 px-3 py-2 border rounded-lg text-sm ${
+                      showLinkModal.status === 'confirmed' || showLinkModal.status === 'registered'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-gray-50 text-gray-400 border-gray-200'
+                    }`}
                   />
                   <button
                     onClick={() => {
-                      if (showLinkModal.status === 'confirmed') {
+                      if (showLinkModal.status === 'confirmed' || showLinkModal.status === 'registered') {
                         copyToClipboard(getFormUrl(showLinkModal))
                       } else {
                         alert('후보일정이 확정된 후에 복사가 가능합니다.')
                       }
                     }}
-                    className={`px-4 py-2 rounded-lg transition-colors text-sm ${showLinkModal.status === 'confirmed'
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
+                    className={`px-4 py-2 rounded-lg transition-colors text-sm ${
+                      showLinkModal.status === 'confirmed' || showLinkModal.status === 'registered'
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                   >
                     복사
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   {showLinkModal.status === 'registered'
-                    ? '전문가가 일정을 선택 완료했습니다.'
+                    ? '전문가가 일정을 선택 완료했습니다. 프로필 등록을 요청하세요.'
                     : showLinkModal.status === 'unavailable'
                       ? '전문가가 가능한 일정이 없다고 응답했습니다. 일정을 재조율해 주세요.'
-                      : '전문가분께 이 링크를 전달하여 일정을 선택 받으세요.'}
+                      : showLinkModal.status === 'confirmed'
+                        ? '전문가분께 이 링크를 전달하여 일정 선택 및 프로필 등록을 요청하세요.'
+                        : '후보일정이 확정된 후 전문가에게 요청할 수 있습니다.'}
                 </p>
               </div>
 
-              {/* 전문가 프로필 등록 링크 */}
-              <div className="border-t pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  전문가 프로필 등록 URL
-                  {showLinkModal.status !== 'registered' && (
-                    <span className="text-orange-500 font-normal text-xs ml-1">(일정 선택 완료 후 사용 가능)</span>
-                  )}
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={getFormUrl(showLinkModal)}
-                    className={`flex-1 px-3 py-2 border rounded-lg text-sm ${showLinkModal.status === 'registered'
-                      ? 'bg-purple-50 border-purple-200'
-                      : 'bg-gray-50 text-gray-400 border-gray-200'
-                      }`}
-                  />
-                  <button
-                    onClick={() => {
-                      if (showLinkModal.status !== 'registered') {
-                        alert('전문가가 일정을 선택한 후에 복사가 가능합니다.')
-                      } else {
-                        copyToClipboard(getFormUrl(showLinkModal))
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-lg transition-colors text-sm ${showLinkModal.status === 'registered'
-                      ? 'bg-purple-600 text-white hover:bg-purple-700'
-                      : 'bg-gray-300 cursor-not-allowed'
-                      }`}
-                  >
-                    복사
-                  </button>
+              {/* 이메일 문구 */}
+              {(showLinkModal.status === 'confirmed' || showLinkModal.status === 'registered') && (
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">전문가 요청 이메일 문구</label>
+                    <button
+                      onClick={() => {
+                        const emailText = showLinkModal.status === 'registered'
+                          ? `안녕하세요, ${showLinkModal.name} 님.\n\n세미나 발표 관련 프로필 등록을 요청드립니다.\n\n아래 링크에서 프로필 정보를 입력해 주시기 바랍니다.\n\n▶ 접속 링크: ${getFormUrl(showLinkModal)}\n▶ 접속 비밀번호: ${showLinkModal.password}\n\n확정된 일정: ${showLinkModal.selectedSlot?.date} ${showLinkModal.selectedSlot?.time}\n\n감사합니다.`
+                          : `안녕하세요, ${showLinkModal.name} 님.\n\n세미나 발표 일정 확인을 요청드립니다.\n\n아래 링크에서 가능한 일정을 선택해 주시기 바랍니다.\n\n▶ 접속 링크: ${getFormUrl(showLinkModal)}\n▶ 접속 비밀번호: ${showLinkModal.password}\n\n일정 선택 후 프로필 정보 입력도 함께 부탁드립니다.\n\n감사합니다.`
+                        copyToClipboard(emailText)
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      문구 복사
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line">
+                    {showLinkModal.status === 'registered' ? (
+                      <>
+                        안녕하세요, {showLinkModal.name} 님.{'\n\n'}
+                        세미나 발표 관련 프로필 등록을 요청드립니다.{'\n\n'}
+                        아래 링크에서 프로필 정보를 입력해 주시기 바랍니다.{'\n\n'}
+                        ▶ 접속 링크: <span className="text-blue-600">{getFormUrl(showLinkModal)}</span>{'\n'}
+                        ▶ 접속 비밀번호: <span className="font-mono font-bold">{showLinkModal.password}</span>{'\n\n'}
+                        확정된 일정: <span className="font-semibold">{showLinkModal.selectedSlot?.date} {showLinkModal.selectedSlot?.time}</span>{'\n\n'}
+                        감사합니다.
+                      </>
+                    ) : (
+                      <>
+                        안녕하세요, {showLinkModal.name} 님.{'\n\n'}
+                        세미나 발표 일정 확인을 요청드립니다.{'\n\n'}
+                        아래 링크에서 가능한 일정을 선택해 주시기 바랍니다.{'\n\n'}
+                        ▶ 접속 링크: <span className="text-blue-600">{getFormUrl(showLinkModal)}</span>{'\n'}
+                        ▶ 접속 비밀번호: <span className="font-mono font-bold">{showLinkModal.password}</span>{'\n\n'}
+                        일정 선택 후 프로필 정보 입력도 함께 부탁드립니다.{'\n\n'}
+                        감사합니다.
+                      </>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">전문가분께 이 링크를 전달하여 프로필 정보를 입력 받으세요.</p>
-              </div>
+              )}
 
               <div className="border-t pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">접근 비밀번호 (전문가용)</label>

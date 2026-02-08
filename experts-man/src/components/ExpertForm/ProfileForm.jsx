@@ -3,6 +3,19 @@ function ProfileForm({ data, onChange }) {
     onChange({ ...data, [field]: value })
   }
 
+  const handleIdNumberChange = (value) => {
+    // Remove all non-digit characters
+    const digits = value.replace(/\D/g, '')
+
+    // Format with hyphen after 6 digits
+    let formatted = digits
+    if (digits.length > 6) {
+      formatted = digits.slice(0, 6) + '-' + digits.slice(6, 13)
+    }
+
+    onChange({ ...data, idNumber: formatted })
+  }
+
   const handleEducationChange = (index, field, value) => {
     const newEducation = [...(data.education || [])]
     newEducation[index] = { ...newEducation[index], [field]: value }
@@ -56,7 +69,8 @@ function ProfileForm({ data, onChange }) {
           <input
             type="text"
             value={data.idNumber || ''}
-            onChange={(e) => handleChange('idNumber', e.target.value)}
+            onChange={(e) => handleIdNumberChange(e.target.value)}
+            maxLength={14}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="000000-0000000"
           />

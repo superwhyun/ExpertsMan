@@ -42,7 +42,6 @@ ExpertsMan/
 │   │       └── token.ts       # 토큰 유틸리티
 │   ├── migrations/            # D1 마이그레이션
 │   ├── wrangler.toml          # Workers 설정
-│   ├── server.js              # (레거시) Express 서버
 │   └── .dev.vars              # 로컬 개발 환경변수
 │
 ├── experts-man/               # React 프론트엔드
@@ -80,28 +79,18 @@ cd ../experts-man && npm install
 
 ### 로컬 개발 실행
 
-#### 1. 백엔드 (Cloudflare Workers)
-
 ```bash
-cd backend
-
 # D1 로컬 데이터베이스 초기화 (최초 1회)
-npm run db:migrate
+cd backend && npm run db:migrate && cd ..
 
-# Workers 개발 서버 실행 (포트 8787)
-npm run dev:local
-```
-
-#### 2. 프론트엔드
-
-```bash
-cd experts-man
-
-# 개발 서버 실행 (포트 5173)
+# 프론트엔드 + 백엔드 동시 실행
 npm run dev
+
+# Cloudflare 환경 시뮬레이션
+npm run dev:cf
 ```
 
-#### 3. 접속
+#### 접속
 
 - 프론트엔드: http://localhost:5173
 - API: http://localhost:8787
@@ -221,14 +210,8 @@ npx wrangler pages deploy dist --project-name=expertsman
 ### 루트에서 한번에 배포하기
 
 ```bash
-# 프로젝트 루트에서
-
-# 백엔드 배포
-npm run deploy:backend
-
-# 프론트엔드 빌드 & 배포
-npm run build:frontend
-npm run deploy:frontend
+# 프로젝트 루트에서 (빌드 + 프론트엔드 배포 + 백엔드 배포)
+npm run deploy
 ```
 
 ---
@@ -251,8 +234,7 @@ cd backend && npm run deploy
 cd experts-man && npm run build && npx wrangler pages deploy dist --project-name=expertsman
 
 # 둘 다 수정한 경우 (루트에서)
-npm run deploy:backend
-npm run build:frontend && npm run deploy:frontend
+npm run deploy
 ```
 
 ---
@@ -296,21 +278,15 @@ npm run build:frontend && npm run deploy:frontend
 | POST | `/api/workspaces/:slug/experts/:id/confirm` | 일정 확정 |
 | POST | `/api/workspaces/:slug/experts/:id/select-slot` | 전문가 일정 선택 |
 
-## 레거시 모드 (Express)
-
-기존 Express 서버를 사용하려면:
-
-```bash
-cd backend
-
-# 레거시 의존성 설치
-npm install express cors dotenv sqlite sqlite3
-
-# Express 서버 실행
-npm run start:legacy
-```
-
 ## 스크립트
+
+### Root
+
+| 스크립트 | 설명 |
+|----------|------|
+| `npm run dev` | 로컬 개발 (프론트엔드 + 백엔드) |
+| `npm run dev:cf` | Cloudflare 환경 시뮬레이션 |
+| `npm run deploy` | Cloudflare 전체 배포 |
 
 ### Backend
 
@@ -321,7 +297,6 @@ npm run start:legacy
 | `npm run deploy` | Workers 배포 |
 | `npm run db:migrate` | 로컬 D1 마이그레이션 |
 | `npm run db:migrate:prod` | 프로덕션 D1 마이그레이션 |
-| `npm run start:legacy` | 레거시 Express 서버 |
 
 ### Frontend
 

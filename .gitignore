@@ -8,3 +8,5 @@ dist-ssr/
 *.log
 backend/database.sqlite
 .env
+.wrangler/
+backend/.wrangler/
