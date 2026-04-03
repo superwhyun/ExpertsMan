@@ -23,17 +23,6 @@ function MemberPollPage() {
         fetchData()
     }, [expertId, workspace])
 
-    // Load my previously selected slots ONLY once when name is submitted
-    useEffect(() => {
-        if (isNameSubmitted && expert && expert.pollingSlots) {
-            const mySlots = expert.pollingSlots
-                .filter(slot => slot.voters && slot.voters.includes(voterName))
-                .map(slot => slot.id)
-            console.log('Initial selected slots for', voterName, ':', mySlots)
-            setSelectedSlots(mySlots)
-        }
-    }, [isNameSubmitted, expertId, voterName]) // Removed 'expert' from deps to avoid reset on save
-
     const toggleSlot = (slotId) => {
         setSelectedSlots(prev => {
             if (prev.includes(slotId)) {
@@ -50,7 +39,8 @@ function MemberPollPage() {
             return
         }
         try {
-            await updateMemberVotes(expertId, voterName, selectedSlots, workspace)
+            const normalizedVoterName = voterName.trim()
+            await updateMemberVotes(expertId, normalizedVoterName, selectedSlots, workspace)
             setSaveMessage('투표가 성공적으로 저장되었습니다!')
 
             // Refresh local data to show updated voter list and labels
@@ -93,8 +83,11 @@ function MemberPollPage() {
         e.preventDefault()
         if (!voterName.trim() || !voterPassword.trim()) return
 
-        const result = await checkVoterPassword(expertId, voterName.trim(), voterPassword.trim(), workspace)
+        const normalizedVoterName = voterName.trim()
+        const result = await checkVoterPassword(expertId, normalizedVoterName, voterPassword.trim(), workspace)
         if (result.success) {
+            setVoterName(normalizedVoterName)
+            setSelectedSlots(result.selectedSlotIds || [])
             setIsNameSubmitted(true)
             setErrorMessage('')
         } else {

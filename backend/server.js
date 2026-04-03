@@ -423,13 +423,14 @@ app.post('/api/workspaces/:slug/experts/:id/verify-password', validateWorkspace,
 
         if (existing) {
             if (existing.password === password) {
-                res.json({ success: true });
+                const selectedSlots = await db.all('SELECT slotId FROM voter_responses WHERE expertId = ? AND voterName = ?', [id, voterName]);
+                res.json({ success: true, selectedSlotIds: selectedSlots.map(slot => slot.slotId) });
             } else {
                 res.json({ success: false, message: '비밀번호가 일치하지 않습니다.' });
             }
         } else {
             await db.run('INSERT INTO voter_passwords (expertId, voterName, password) VALUES (?, ?, ?)', [id, voterName, password]);
-            res.json({ success: true, isNew: true });
+            res.json({ success: true, isNew: true, selectedSlotIds: [] });
         }
     } catch (error) {
         console.error(error);

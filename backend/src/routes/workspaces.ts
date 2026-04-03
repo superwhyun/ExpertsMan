@@ -34,6 +34,16 @@ function toPublicExpert(
   };
 }
 
+async function getSelectedSlotIdsForVoter(c: WorkspaceContext, expertId: string, voterName: string) {
+  const selectedSlotsResult = await c.env.DB.prepare(
+    'SELECT slotId FROM voter_responses WHERE expertId = ? AND voterName = ?'
+  )
+    .bind(expertId, voterName)
+    .all<{ slotId: string }>();
+
+  return selectedSlotsResult.results.map((slot) => slot.slotId);
+}
+
 async function requireExpertAuth(c: WorkspaceContext, expertId: string) {
   const token = c.req.header('x-expert-token');
   const workspace = c.get('workspace');
@@ -673,7 +683,8 @@ workspaces.post('/:slug/experts/:id/verify-password', async (c: WorkspaceContext
             .bind(hashed, id, voterName)
             .run();
         }
-        return c.json({ success: true });
+        const selectedSlotIds = await getSelectedSlotIdsForVoter(c, id, voterName);
+        return c.json({ success: true, selectedSlotIds });
       } else {
         const failed = await registerAuthFailure(c, limitConfig);
         if (failed.blockedNow) {
@@ -696,7 +707,7 @@ workspaces.post('/:slug/experts/:id/verify-password', async (c: WorkspaceContext
         .run();
 
       await clearAuthRateLimit(c, key);
-      return c.json({ success: true, isNew: true });
+      return c.json({ success: true, isNew: true, selectedSlotIds: [] });
     }
   } catch (error) {
     console.error(error);

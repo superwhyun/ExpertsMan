@@ -69,6 +69,11 @@ export async function getExperts(workspace) {
   return await response.json();
 }
 
+export async function getAdminExpertById(id, workspace) {
+  const experts = await getExperts(workspace);
+  return experts.find(expert => expert.id === id) || null;
+}
+
 // Get expert by ID (public - no auth required)
 export async function getExpertById(id, workspace) {
   const response = await fetch(`${getWorkspaceApiBase(workspace)}/experts/${id}`);

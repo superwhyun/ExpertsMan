@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  getExperts, createExpert, deleteExpert, saveExpert, getExpertById,
+  getExperts, createExpert, deleteExpert, saveExpert, getAdminExpertById,
   addPollingSlot, deletePollingSlot, confirmSlots, startPolling, resetConfirmation,
   getWorkspaceSettings, resetExpertPassword, updateWorkspaceSettings
 } from '../utils/storage'
@@ -167,7 +167,12 @@ function AdminPage() {
   }
 
   const handleOpenPollingModal = async (expert) => {
-    const latestExpert = await getExpertById(expert.id, workspace)
+    const latestExpert = await getAdminExpertById(expert.id, workspace)
+    setExperts(prevExperts =>
+      latestExpert
+        ? prevExperts.map(current => (current.id === latestExpert.id ? latestExpert : current))
+        : prevExperts
+    )
     setShowPollingModal(latestExpert)
   }
 
